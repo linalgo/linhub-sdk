@@ -1,0 +1,13 @@
+# IDEs and editors
+.project
+.pydevproject
+
+# compiled output
+*.pyc
+
+# virtualenv
+venv/
+
+# Other
+.pytest_cache/
+Linalgo.egg-info/
