@@ -2,6 +2,9 @@
 .project
 .pydevproject
 
+# Documentation
+doc/_build
+
 # compiled output
 *.pyc
 

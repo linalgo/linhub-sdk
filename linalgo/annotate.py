@@ -3,6 +3,9 @@ from mock.mock import self
 
 
 class Annotation:
+    """
+    Annotation class compatible with the W3C annotation data model.
+    """
 
     def __init__(self, uri, type_id, task_id, text, owner, document_id,
                  annotation_id=None):
@@ -19,6 +22,9 @@ class Annotation:
 
 
 class Annotations(MutableSequence):
+    """
+    Class to list of annotations with custom indexing.
+    """
 
     def __init__(self, annotations=None):
         super(Annotations, self).__init__()
@@ -62,6 +68,9 @@ class Annotations(MutableSequence):
 
 
 class Annotator:
+    """
+    The Annotator class can create, delete or modify Annotations.
+    """
 
     def __init__(self, name):
         self.name = name
@@ -71,6 +80,9 @@ class Annotator:
 
 
 class Document:
+    """
+    Base class that holds the document on which to perform annotations.
+    """
 
     def __init__(self, name, content, corpus, metadata=None, document_id=None):
         self.name = name
@@ -94,6 +106,10 @@ class Document:
 
 
 class Task:
+    """
+    The Task class contains all information about a task: entities, corpora, 
+    annotations.
+    """
 
     def __init__(self, name, description, entities=None, corpora=None,
                  annotators=None, annotations=[], documents=[], task_id=None):
