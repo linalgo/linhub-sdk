@@ -82,16 +82,20 @@ class LinalgoClient:
             tasks.append(task)
         return tasks
 
+    def get_task_documents(self, task_id):
+        docs_url = f"/tasks/{task_id}/documents/?page_size=1000"
+        docs_json = json.loads(self.request(docs_url))
+        return [json2doc(doc_json) for doc_json in docs_json['results']]
+
+    def get_task_annotations(self, task_id):
+        annotations_url = f"/tasks/{task_id}/annotations/?page_size=100000"
+        ann_json = json.loads(self.request(annotations_url))
+        return [json2anno(a_json) for a_json in ann_json['results']]
+
     def get_task(self, task_id):
         task_url = f"/tasks/{task_id}/"
         task_json = json.loads(self.request(task_url))
         task = json2task(task_json)
-        docs_url = f"/tasks/{task_id}/documents/?page_size=1000"
-        docs_json = json.loads(self.request(docs_url))
-        docs = [json2doc(doc_json) for doc_json in docs_json['results']]
-        task.documents = docs
-        annotations_url = f"/tasks/{task_id}/annotations/?page_size=100000"
-        ann_json = json.loads(self.request(annotations_url))
-        annotations = [json2anno(a_json) for a_json in ann_json['results']]
-        task.annotations = annotations
+        task.documents = self.get_task_documents(task_id)
+        task.annotations = self.get_task_annotations(task_id)
         return task

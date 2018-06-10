@@ -28,6 +28,12 @@ class Annotations(MutableSequence):
         for annotation in annotations:
             self.append(annotation)
 
+    def get_users(self):
+        return self._user_index.keys()
+
+    def by_user(self, name):
+        return self._user_index[name]
+
     def __repr__(self):
         return "<{0} {1}>".format(self.__class__.__name__, self._list)
 
@@ -118,6 +124,14 @@ class Task:
         for annotation in self.annotations:
             doc_id = annotation.document_id
             self._documents[doc_id].annotations.append(annotation)
+
+    def transform(self, target='binary', label=None):
+        docs = []
+        labels = []
+        for doc in self.documents:
+            docs.append(doc.content)
+            labels.append(1 if label in doc.labels else 0)
+        return docs, labels
 
     def __repr__(self):
         rep = (f"name: {self.name}\ndescription: {self.description}\n# "
