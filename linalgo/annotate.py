@@ -7,15 +7,60 @@ class Annotation:
     Annotation class compatible with the W3C annotation data model.
     """
 
-    def __init__(self, uri, type_id, task_id, text, owner, document_id,
-                 annotation_id=None):
+    def __init__(self, uri, type_id, text, owner, task_id=None,
+                 document_id=None, annotation_id=None):
         self.id = annotation_id
         self.uri = uri
         self.type_id = type_id
-        self.task_id = task_id
         self.text = text
+        self.task_id = task_id
         self.owner = owner
         self.document_id = document_id
+
+    def to_json(self):
+        data = {
+            "type_name": "UNKNOWN",
+            "group": self.task_id,
+            "target": [{
+                "source": f"/tasks/{self.task_id}/annotate/{self.document_id}",
+                "selector": [{
+                    "conformsTo": "https://tools.ietf.org/html/rfc3236",
+                    "type": "FragmentSelector",
+                    "value": "annotate_append_area"
+                }, {
+                    "endContainer": "/anno-root[1]/anno-layout[1]/main[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/div[1]/anno-task-annotation[1]/anno-task-document[1]/div[1]/mat-card[1]/mat-card-content[1]/pre[1]/p[1]",
+                    "endOffset": 3,
+                    "type": "RangeSelector",
+                    "startOffset": 0,
+                    "startContainer": "/anno-root[1]/anno-layout[1]/main[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/div[1]/anno-task-annotation[1]/anno-task-document[1]/div[1]/mat-card[1]/mat-card-content[1]/pre[1]/p[1]"
+                }]
+            }],
+            "type_id": self.type_id,
+            "text": "",
+            "created": "2018-05-16T02:00:40.854Z",
+            "display_options": {},
+            "uri": f"/tasks/{self.task_id}/annotate/{self.document_id}",
+            "tags": [],
+            "user": f"acct:{self.name}@linalgo",
+            "permissions": {
+                "read": [f"acct:{self.name}@linalgo"],
+                "update": [f"acct:{self.name}@linalgo"],
+                "delete": [f"acct:{self.name}@linalgo"]
+            },
+            "id": 1,
+            "type_action": "showType",
+            "type_flashcard_type": "default"
+        }
+        js = {
+            'uri': self.uri,
+            'type_id': self.type_id,
+            'text': self.text,
+            'group': self.task_id,
+            'owner_id': self.owner,
+            'document_id': self.document_id,
+            'data': data
+            }
+        return js
 
     def __repr__(self):
         return str(self.type_id)
@@ -72,11 +117,48 @@ class Annotator:
     The Annotator class can create, delete or modify Annotations.
     """
 
-    def __init__(self, name):
+    def __init__(self, name, task=None, model=None, annotation_type_id=None,
+                 threshold=0.5):
         self.name = name
+        self.task = task
+        self.model = model
+        self.type_id = annotation_type_id
+        self.threshold = threshold
 
-    def annotate(self, document, annotation):
-        document.annotations.add(annotation)
+    def assign_task(self, task):
+        self.task = task
+
+    def _get_annotation(self, document):
+        prob = self.model.decision_function([document.content])[0]
+        print(prob)
+        if prob >= self.threshold:
+            label = self.type_id
+            annotation = Annotation(
+                uri='',
+                type_id=label,
+                text=document.content,
+                owner=self.name,
+                task_id=self.task.id,
+                document_id=document.id
+            )
+            return annotation
+        else:
+            return None
+
+    def annotate(self, document):
+        annotation = self._get_annotation(document)
+        if annotation is not None:
+            self.task.annotations.append(annotation)
+            document.annotations.append(annotation)
+        return annotation
+
+
+class Corpus:
+
+    def __init__(self, name, description, documents=[]):
+        self.name = name
+        self.description = description
+        self.documents = documents
 
 
 class Document:
@@ -84,7 +166,8 @@ class Document:
     Base class that holds the document on which to perform annotations.
     """
 
-    def __init__(self, name, content, corpus, metadata=None, document_id=None):
+    def __init__(self, name, content, corpus=None, metadata=None,
+                 document_id=None):
         self.name = name
         self.content = content
         self.corpus = corpus
@@ -112,7 +195,8 @@ class Task:
     """
 
     def __init__(self, name, description, entities=None, corpora=None,
-                 annotators=None, annotations=[], documents=[], task_id=None):
+                 annotators=None, annotations=Annotations([]), documents=[],
+                 task_id=None):
         self.id = task_id
         self.name = name
         self.description = description

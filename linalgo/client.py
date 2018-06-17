@@ -2,17 +2,17 @@ import json
 
 from http.client import HTTPConnection, HTTPSConnection
 
-from .annotate import Annotation, Document, Task
+from .annotate import Annotation, Corpus, Document, Task
 
 
 def json2anno(js):
     return Annotation(
             uri=js['uri'],
-            document_id=js['document'],
             type_id=js['type'],
-            task_id=js['group'],
             text=js['text'],
-            owner=js['owner']
+            owner=js['owner'],
+            document_id=js['document'],
+            task_id=js['group']
         )
 
 
@@ -72,6 +72,33 @@ class LinalgoClient:
         data = res.read()
         return data
 
+    def get_corpora(self):
+        url = f"/corpora/"
+        corpora = []
+        res = json.loads(self.request(url))
+        for js in res['results']:
+            corpus_id = js['id']
+            corpus = self.get_corpus(corpus_id)
+            corpora.append(corpus)
+        return corpora
+
+    def get_corpus(self, corpus_id):
+        url = f"/corpora/{corpus_id}/"
+        res = json.loads(self.request(url))
+        corpus = Corpus(name=res['name'], description=res['description'])
+        documents = self.get_corpus_documents(corpus_id)
+        corpus.documents = documents
+        return corpus
+
+    def get_corpus_documents(self, corpus_id):
+        url = f"/corpora/{corpus_id}/documents/?page_size=100000"
+        res = json.loads(self.request(url))
+        documents = []
+        for js in res['results']:
+            document = json2doc(js)
+            documents.append(document)
+        return documents
+
     def get_tasks(self):
         url = "/tasks/"
         tasks = []
@@ -83,7 +110,7 @@ class LinalgoClient:
         return tasks
 
     def get_task_documents(self, task_id):
-        docs_url = f"/tasks/{task_id}/documents/?page_size=1000"
+        docs_url = f"/tasks/{task_id}/documents/?page_size=100000"
         docs_json = json.loads(self.request(docs_url))
         return [json2doc(doc_json) for doc_json in docs_json['results']]
 
