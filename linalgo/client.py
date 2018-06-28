@@ -50,13 +50,13 @@ class LinalgoClient:
         payload = json.dumps({
             'token': self.access_token
         })
-        conn.request("POST", "/jwt/verify/", payload, headers)
+        conn.request("GET", "/auth/client-token/", payload, headers)
         res = conn.getresponse()
         return res.status == 200
 
     def request(self, url):
         conn = HTTPConnection(self.api_url)
-        headers = {'Authorization': "JWT %s" % self.access_token}
+        headers = {'Authorization': "Token %s" % self.access_token}
         conn.request("GET", url, headers=headers)
         res = conn.getresponse()
         data = res.read()
