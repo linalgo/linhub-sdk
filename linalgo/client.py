@@ -39,34 +39,24 @@ def json2task(js):
 
 class LinalgoClient:
 
-    def __init__(self, client_id, client_secret, audience="annotate-api",
-                 api_url="localhost:8000"):
+    def __init__(self, token, api_url="localhost:8000"):
         self.api_url = api_url
-        self.audience = audience
-        self.id = client_id
-        self.secret = client_secret
+        self.access_token = token
         self.authenticate()
 
     def authenticate(self):
-        conn = HTTPSConnection("linalgo.eu.auth0.com")
+        conn = HTTPConnection(self.api_url)
         headers = {'content-type': "application/json"}
         payload = json.dumps({
-            'client_id': self.id,
-            'client_secret': self.secret,
-            'audience': self.audience,
-            'grant_type': "client_credentials"
+            'token': self.access_token
         })
-        conn.request("POST", "/oauth/token", payload, headers)
+        conn.request("GET", "/auth/client-token/", payload, headers)
         res = conn.getresponse()
-        data = res.read()
-        data = json.loads(data.decode("utf-8"))
-        self.access_token = data['access_token']
-        self.expires_in = data['expires_in']
-        self.token_type = data['token_type']
+        return res.status == 200
 
     def request(self, url):
         conn = HTTPConnection(self.api_url)
-        headers = {'authorization': f"Bearer {self.access_token}"}
+        headers = {'Authorization': "Token %s" % self.access_token}
         conn.request("GET", url, headers=headers)
         res = conn.getresponse()
         data = res.read()
