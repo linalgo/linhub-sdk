@@ -7,11 +7,12 @@ class Annotation:
     Annotation class compatible with the W3C annotation data model.
     """
 
-    def __init__(self, uri, type_id, text, owner, task_id=None,
+    def __init__(self, uri, type_id, text, owner, task_id=None, score=None,
                  document_id=None, annotation_id=None):
         self.id = annotation_id
         self.uri = uri
         self.type_id = type_id
+        self.score = score
         self.text = text
         self.task_id = task_id
         self.owner = owner
@@ -129,21 +130,21 @@ class Annotator:
         self.task = task
 
     def _get_annotation(self, document):
-        prob = self.model.decision_function([document.content])[0]
-        print(prob)
-        if prob >= self.threshold:
+        score = self.model.decision_function([document.content])[0]
+        if score >= self.threshold:
             label = self.type_id
-            annotation = Annotation(
-                uri='',
-                type_id=label,
-                text=document.content,
-                owner=self.name,
-                task_id=self.task.id,
-                document_id=document.id
-            )
-            return annotation
         else:
-            return None
+            label = -1
+        annotation = Annotation(
+            uri='',
+            type_id=label,
+            score=score,
+            text=document.content,
+            owner=self.name,
+            task_id=self.task.id,
+            document_id=document.id
+        )
+        return annotation
 
     def annotate(self, document):
         annotation = self._get_annotation(document)

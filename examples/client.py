@@ -6,8 +6,7 @@ import os
 
 def example():
 
-    token = os.environ.get('ACCESS_TOKEN', None)
-
+    token = '3cc643ce21e0ffdecbaa6d3eae833726227378ff'
     if token is not None:
         c = LinalgoClient(token)
         c.authenticate()
