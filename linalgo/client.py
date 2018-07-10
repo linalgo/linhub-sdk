@@ -81,12 +81,14 @@ class LinalgoClient:
             documents.append(document)
         return documents
 
-    def get_tasks(self):
+    def get_tasks(self, task_ids=[]):
         url = "/tasks/"
         tasks = []
         res = self.request(url)
-        for js in res['results']:
-            task_id = js['id']
+        if task_ids is []:
+            for js in res['results']:
+                task_ids.appen(js['id'])
+        for task_id in task_ids:
             task = self.get_task(task_id)
             tasks.append(task)
         return tasks
