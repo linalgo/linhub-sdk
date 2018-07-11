@@ -1,5 +1,4 @@
 from collections import defaultdict, MutableSequence
-from mock.mock import self
 
 
 class Annotation:
@@ -7,8 +6,9 @@ class Annotation:
     Annotation class compatible with the W3C annotation data model.
     """
 
-    def __init__(self, uri, type_id, text, owner, task_id=None, score=None,
-                 document_id=None, annotation_id=None):
+    def __init__(self, uri, type_id, text, owner=None, task_id=None,
+                 score=None, document_id=None, annotation_id=None,
+                 annotator=None):
         self.id = annotation_id
         self.uri = uri
         self.type_id = type_id
@@ -16,6 +16,7 @@ class Annotation:
         self.text = text
         self.task_id = task_id
         self.owner = owner
+        self.annotator = annotator
         self.document_id = document_id
 
     def to_json(self):
@@ -42,11 +43,11 @@ class Annotation:
             "display_options": {},
             "uri": f"/tasks/{self.task_id}/annotate/{self.document_id}",
             "tags": [],
-            "user": f"acct:{self.name}@linalgo",
+            "user": f"acct:{self.owner}@linalgo",
             "permissions": {
-                "read": [f"acct:{self.name}@linalgo"],
-                "update": [f"acct:{self.name}@linalgo"],
-                "delete": [f"acct:{self.name}@linalgo"]
+                "read": [f"acct:{self.owner}@linalgo"],
+                "update": [f"acct:{self.owner}@linalgo"],
+                "delete": [f"acct:{self.owner}@linalgo"]
             },
             "id": 1,
             "type_action": "showType",
@@ -57,7 +58,8 @@ class Annotation:
             'type_id': self.type_id,
             'text': self.text,
             'group': self.task_id,
-            'owner_id': self.owner,
+            'owner': self.owner,
+            'annotator': self.annotator,
             'document_id': self.document_id,
             'data': data
             }
@@ -136,11 +138,11 @@ class Annotator:
         else:
             label = -1
         annotation = Annotation(
-            uri='',
+            uri=f'/tasks/{self.task.id}/annotate/{document.id}',
             type_id=label,
             score=score,
             text=document.content,
-            owner=self.name,
+            annotator={"name": self.name, "model": None},
             task_id=self.task.id,
             document_id=document.id
         )
