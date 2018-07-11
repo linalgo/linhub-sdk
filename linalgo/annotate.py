@@ -6,8 +6,9 @@ class Annotation:
     Annotation class compatible with the W3C annotation data model.
     """
 
-    def __init__(self, uri, type_id, text, owner, task_id=None, score=None,
-                 document_id=None, annotation_id=None, annotator=None):
+    def __init__(self, uri, type_id, text, owner=None, task_id=None,
+                 score=None, document_id=None, annotation_id=None,
+                 annotator=None):
         self.id = annotation_id
         self.uri = uri
         self.type_id = type_id
@@ -120,13 +121,12 @@ class Annotator:
     """
 
     def __init__(self, name, task=None, model=None, annotation_type_id=None,
-                 threshold=0.5, owner_id=2):
+                 threshold=0.5):
         self.name = name
         self.task = task
         self.model = model
         self.type_id = annotation_type_id
         self.threshold = threshold
-        self.owner = owner_id
 
     def assign_task(self, task):
         self.task = task
@@ -138,11 +138,10 @@ class Annotator:
         else:
             label = -1
         annotation = Annotation(
-            uri=f'document@{document.id}',
+            uri=f'/tasks/{self.task.id}/annotate/{document.id}',
             type_id=label,
             score=score,
             text=document.content,
-            owner=self.owner,
             annotator={"name": self.name, "model": None},
             task_id=self.task.id,
             document_id=document.id

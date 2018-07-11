@@ -85,9 +85,9 @@ class LinalgoClient:
         url = "/tasks/"
         tasks = []
         res = self.request(url)
-        if task_ids is []:
+        if task_ids == []:
             for js in res['results']:
-                task_ids.appen(js['id'])
+                task_ids.append(js['id'])
         for task_id in task_ids:
             task = self.get_task(task_id)
             tasks.append(task)
