@@ -8,7 +8,7 @@ class Annotation:
 
     def __init__(self, uri, type_id, text, owner=None, task_id=None,
                  score=None, document_id=None, annotation_id=None,
-                 annotator=None):
+                 annotator=None, data=None):
         self.id = annotation_id
         self.uri = uri
         self.type_id = type_id
@@ -18,41 +18,35 @@ class Annotation:
         self.owner = owner
         self.annotator = annotator
         self.document_id = document_id
+        self.data = data
 
     def to_json(self):
-        data = {
-            "type_name": "UNKNOWN",
-            "group": self.task_id,
-            "target": [{
-                "source": f"/tasks/{self.task_id}/annotate/{self.document_id}",
-                "selector": [{
-                    "conformsTo": "https://tools.ietf.org/html/rfc3236",
-                    "type": "FragmentSelector",
-                    "value": "annotate_append_area"
-                }, {
-                    "endContainer": "/anno-root[1]/anno-layout[1]/main[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/div[1]/anno-task-annotation[1]/anno-task-document[1]/div[1]/mat-card[1]/mat-card-content[1]/pre[1]/p[1]",
-                    "endOffset": 3,
-                    "type": "RangeSelector",
-                    "startOffset": 0,
-                    "startContainer": "/anno-root[1]/anno-layout[1]/main[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/div[1]/anno-task-annotation[1]/anno-task-document[1]/div[1]/mat-card[1]/mat-card-content[1]/pre[1]/p[1]"
-                }]
-            }],
-            "type_id": self.type_id,
-            "text": "",
-            "created": "2018-05-16T02:00:40.854Z",
-            "display_options": {},
-            "uri": f"/tasks/{self.task_id}/annotate/{self.document_id}",
-            "tags": [],
-            "user": f"acct:{self.owner}@linalgo",
-            "permissions": {
-                "read": [f"acct:{self.owner}@linalgo"],
-                "update": [f"acct:{self.owner}@linalgo"],
-                "delete": [f"acct:{self.owner}@linalgo"]
-            },
-            "id": 1,
-            "type_action": "showType",
-            "type_flashcard_type": "default"
-        }
+        if self.data is not None:
+            data = self.data
+        else:
+            data = {
+                "type_name": "UNKNOWN",
+                "group": self.task_id,
+                "target": [{
+                    "source": f"/tasks/{self.task_id}/annotate/{self.document_id}",
+                    "selector": []
+                }],
+                "type_id": self.type_id,
+                "text": "",
+                "created": "",
+                "display_options": {},
+                "uri": f"/tasks/{self.task_id}/annotate/{self.document_id}",
+                "tags": [],
+                "user": f"acct:{self.owner}@linalgo",
+                "permissions": {
+                    "read": [f"acct:{self.owner}@linalgo"],
+                    "update": [f"acct:{self.owner}@linalgo"],
+                    "delete": [f"acct:{self.owner}@linalgo"]
+                },
+                "id": 1,
+                "type_action": "default",
+                "type_flashcard_type": "default"
+            }
         js = {
             'uri': self.uri,
             'type_id': self.type_id,

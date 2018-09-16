@@ -11,7 +11,8 @@ def json2anno(js):
             text=js['text'],
             owner=js['owner'],
             document_id=js['document'],
-            task_id=js['group']
+            task_id=js['group'],
+            data=js['data']
         )
 
 
