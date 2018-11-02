@@ -1,10 +1,16 @@
-import json
 import requests
 
-from .annotate import Annotation, Corpus, Document, Task
+from .annotate import Annotation, Annotator, Corpus, Document, Task
 
 
-def json2anno(js):
+def json2annotator(js):
+    return Annotator(
+        name=js['name'],
+        annotator_id=js['id']
+    )
+
+
+def json2annotation(js):
     return Annotation(
             uri=js['uri'],
             type_id=js['type'],
@@ -86,7 +92,7 @@ class LinalgoClient:
         url = "/tasks/"
         tasks = []
         res = self.request(url)
-        if task_ids == []:
+        if len(task_ids) == 0:
             for js in res['results']:
                 task_ids.append(js['id'])
         for task_id in task_ids:
@@ -95,26 +101,51 @@ class LinalgoClient:
         return tasks
 
     def get_task_documents(self, task_id):
-        docs_url = f"/tasks/{task_id}/documents/?page_size=100000"
+        docs_url = f"/tasks/{task_id}/rawdocs/"
         docs_json = self.request(docs_url)
-        return [json2doc(doc_json) for doc_json in docs_json['results']]
+        return [json2doc(doc_json) for doc_json in docs_json]
 
     def get_task_annotations(self, task_id):
-        annotations_url = f"/tasks/{task_id}/annotations/?page_size=100000"
+        annotations_url = f"/tasks/{task_id}/rawannotations"
         ann_json = self.request(annotations_url)
-        return [json2anno(a_json) for a_json in ann_json['results']]
+        return [json2annotation(a_json) for a_json in ann_json]
 
     def get_task(self, task_id):
         task_url = f"/tasks/{task_id}/"
         task_json = self.request(task_url)
         task = json2task(task_json)
+        task.entities = self.request(task_url + 'entities')
         task.documents = self.get_task_documents(task_id)
         task.annotations = self.get_task_annotations(task_id)
         return task
 
-    def upload(self, annotations):
+    def get_annotators(self):
+        annotators_url = f"/annotators/"
+        res = self.request(annotators_url)
+        annotators = []
+        for js in res['result']:
+            annotator = json2annotator(js)
+            annotators.append(annotator)
+        return annotators
+
+    def create_annotator(self, annotator):
+        if annotator.annotator_id is not None:
+            raise Exception("Annotator already has an ID.")
+        annotator_url = f"/annotators/"
+        url = self.api_url + annotator_url
+        headers = { 'Authorization': f"Token {self.access_token}"}
+        annotator_json = {
+            'name': annotator.name,
+            'model': str(annotator.model)
+        }
+        res = requests.post(url, json=annotator_json, headers=headers).json()
+        annotator.annotator_id = res['id']
+        annotator.owner = res['owner']
+        return annotator
+
+    def create_annotations(self, annotations):
         url = '/annotations/'
         url = self.api_url + url
         headers = {'Authorization': f"Token {self.access_token}"}
         res = requests.post(url, json=annotations, headers=headers)
-        print(res)
+        return res
