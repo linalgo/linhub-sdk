@@ -49,12 +49,12 @@ class Annotation:
             }
         js = {
             'uri': self.uri,
-            'type_id': self.type_id,
+            'type': self.type_id,
+            'score': self.score,
             'text': self.text,
             'group': self.task_id,
-            'owner': self.owner,
             'annotator': self.annotator,
-            'document_id': self.document_id,
+            'document': self.document_id,
             'data': data
             }
         return js
@@ -115,12 +115,13 @@ class Annotator:
     """
 
     def __init__(self, name, task=None, model=None, annotation_type_id=None,
-                 threshold=0.5):
+                 threshold=0):
         self.name = name
         self.task = task
         self.model = model
         self.type_id = annotation_type_id
         self.threshold = threshold
+        self.annotator_id = None
 
     def assign_task(self, task):
         self.task = task
@@ -130,13 +131,13 @@ class Annotator:
         if score >= self.threshold:
             label = self.type_id
         else:
-            label = -1
+            label = 1  # Viewed
         annotation = Annotation(
             uri=f'/tasks/{self.task.id}/annotate/{document.id}',
             type_id=label,
             score=score,
             text=document.content,
-            annotator={"name": self.name, "model": None},
+            annotator=self.annotator_id,
             task_id=self.task.id,
             document_id=document.id
         )
@@ -185,6 +186,13 @@ class Document:
         self._annotations = Annotations(values)
 
 
+class Entity:
+
+    def __initi__(self, name, entity_id=None):
+        self.id = entity_id
+        self.name = name
+
+
 class Task:
     """
     The Task class contains all information about a task: entities, corpora, 
@@ -220,15 +228,29 @@ class Task:
         self._annotations = Annotations(values)
         for annotation in self.annotations:
             doc_id = annotation.document_id
-            self._documents[doc_id].annotations.append(annotation)
+            if doc_id in self._documents:
+                self._documents[doc_id].annotations.append(annotation)
+            else:
+                # TODO: Investigate the reason for this
+                pass
 
     def transform(self, target='binary', label=None):
         docs = []
         labels = []
-        for doc in self.documents:
-            docs.append(doc.content)
-            labels.append(1 if label in doc.labels else 0)
-        return docs, labels
+        if target == 'binary':
+            for doc in self.documents:
+                docs.append(doc.content)
+                labels.append(1 if label in doc.labels else 0)
+            return docs, labels
+        elif target == 'multilabel':
+            entities = {e['id']: e['title'] for e in self.entities}
+            for document in self.documents:
+                docs.append(document.content)
+                labels.append({entities[l]: 1 for l in document.labels})
+            return docs, labels
+        else:
+            # TODO: raise proper exception
+            raise Exception('target should be `binary` or `multiclass`')
 
     def __repr__(self):
         rep = (f"name: {self.name}\ndescription: {self.description}\n# "
