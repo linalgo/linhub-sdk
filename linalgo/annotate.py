@@ -6,19 +6,15 @@ class Annotation:
     Annotation class compatible with the W3C annotation data model.
     """
 
-    def __init__(self, uri, type_id, text, owner=None, task_id=None,
-                 score=None, document_id=None, annotation_id=None,
-                 annotator=None, data=None):
+    def __init__(self, entity_id, body, annotator=None, task_id=None,
+                 score=None, document_id=None, annotation_id=None):
         self.id = annotation_id
-        self.uri = uri
-        self.type_id = type_id
+        self.type_id = entity_id
         self.score = score
-        self.text = text
+        self.body = body
         self.task_id = task_id
-        self.owner = owner
         self.annotator = annotator
         self.document_id = document_id
-        self.data = data
 
     def to_json(self):
         if self.data is not None:
@@ -105,7 +101,7 @@ class Annotations(MutableSequence):
 
     def append(self, val):
         self.insert(len(self._list), val)
-        self._user_index[val.owner].append(val)
+        self._user_index[val.annotator].append(val)
         self._type_index[val.type_id].append(val)
 
 
@@ -164,12 +160,10 @@ class Document:
     Base class that holds the document on which to perform annotations.
     """
 
-    def __init__(self, name, content, corpus=None, metadata=None,
-                 document_id=None):
+    def __init__(self, name, content, corpus=None, document_id=None):
         self.name = name
         self.content = content
         self.corpus = corpus
-        self.metadata = metadata
         self.id = document_id
         self._annotations = Annotations([])
 
@@ -239,14 +233,16 @@ class Task:
         labels = []
         if target == 'binary':
             for doc in self.documents:
-                docs.append(doc.content)
-                labels.append(1 if label in doc.labels else 0)
+                if len(doc.annotations) > 0:
+                    docs.append(doc.content)
+                    labels.append(1 if label in doc.labels else 0)
             return docs, labels
         elif target == 'multilabel':
             entities = {e['id']: e['title'] for e in self.entities}
             for document in self.documents:
-                docs.append(document.content)
-                labels.append({entities[l]: 1 for l in document.labels})
+                if len(document.annotations) > 0:
+                    docs.append(document.content)
+                    labels.append({entities[l]: 1 for l in document.labels})
             return docs, labels
         else:
             # TODO: raise proper exception
