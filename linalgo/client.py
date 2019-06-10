@@ -12,13 +12,11 @@ def json2annotator(js):
 
 def json2annotation(js):
     return Annotation(
-            uri=js['uri'],
-            type_id=js['type'],
-            text=js['text'],
-            owner=js['owner'],
+            entity_id=js['entity'],
+            body=js['body'],
+            annotator=js['annotator'],
             document_id=js['document'],
-            task_id=js['group'],
-            data=js['data']
+            task_id=js['task'],
         )
 
 
@@ -27,7 +25,6 @@ def json2doc(js):
         name=js['uri'],
         content=js['content'],
         corpus=js['corpus'],
-        metadata=js['metadata'],
         document_id=js['id']
     )
 
@@ -45,14 +42,22 @@ def json2task(js):
 
 class LinalgoClient:
 
+    endpoints = {
+        'annotators': 'annotators/',
+        'corpora': 'corpora/',
+        'documents': 'documents/',
+        'entities': 'entities/',
+        'task': 'tasks/',
+    }
+
     def __init__(self, token, api_url="http://localhost:8000"):
         self.api_url = api_url
         self.access_token = token
 
-    def request(self, url, data=None):
-        url = self.api_url + url
+    def request(self, endpoint, query_params={}):
+        url = '/'.join([self.api_url, endpoint])
         headers = {'Authorization': f"Token {self.access_token}"}
-        res = requests.get(url, headers=headers)
+        res = requests.get(url, headers=headers, params=query_params)
         if res.status_code == 401:
             raise Exception(f"Authentication failed. Please check your token.")
         if res.status_code == 404:
@@ -62,9 +67,8 @@ class LinalgoClient:
         return res.json()
 
     def get_corpora(self):
-        url = f"/corpora/"
+        res = self.request(self.endpoints['corpora'])
         corpora = []
-        res = self.request(url)
         for js in res['results']:
             corpus_id = js['id']
             corpus = self.get_corpus(corpus_id)
@@ -72,7 +76,7 @@ class LinalgoClient:
         return corpora
 
     def get_corpus(self, corpus_id):
-        url = f"/corpora/{corpus_id}/"
+        url = f"{self.enpoints['corpora']}/{corpus_id}/"
         res = self.request(url)
         corpus = Corpus(name=res['name'], description=res['description'])
         documents = self.get_corpus_documents(corpus_id)
@@ -89,7 +93,7 @@ class LinalgoClient:
         return documents
 
     def get_tasks(self, task_ids=[]):
-        url = "/tasks/"
+        url = "tasks/"
         tasks = []
         res = self.request(url)
         if len(task_ids) == 0:
@@ -101,26 +105,37 @@ class LinalgoClient:
         return tasks
 
     def get_task_documents(self, task_id):
-        docs_url = f"/tasks/{task_id}/rawdocs/"
-        docs_json = self.request(docs_url)
-        return [json2doc(doc_json) for doc_json in docs_json]
+        query_params = {'corpus__tasks': task_id, 'page_size': 100000}
+        docs_json = self.request(self.endpoints['documents'], query_params)
+        return [json2doc(doc_json) for doc_json in docs_json['results']]
 
     def get_task_annotations(self, task_id):
-        annotations_url = f"/tasks/{task_id}/rawannotations"
-        ann_json = self.request(annotations_url)
-        return [json2annotation(a_json) for a_json in ann_json]
+        annotations_url = f"annotations/"
+        query_params = {'task': task_id, 'page_size': 100000}
+        ann_json = self.request(annotations_url, query_params)
+        return [json2annotation(a_json) for a_json in ann_json['results']]
 
-    def get_task(self, task_id):
-        task_url = f"/tasks/{task_id}/"
+    def get_task(self, task_id, verbose=False):
+        task_url = f"tasks/{task_id}/"
+        if verbose:
+            print(f'Retrivieving task with id {task_id}...')
         task_json = self.request(task_url)
         task = json2task(task_json)
-        task.entities = self.request(task_url + 'entities')
+        if verbose:
+            print('Retrieving entities...')
+        params = {'tasks': task.id, 'page_size': 100000}
+        entities_json = self.request(self.endpoints['entities'], params)
+        task.entities = entities_json['results']
+        if verbose:
+            print('Retrieving documents...')
         task.documents = self.get_task_documents(task_id)
+        if verbose:
+            print('Retrieving annotations...')
         task.annotations = self.get_task_annotations(task_id)
         return task
 
     def get_annotators(self):
-        annotators_url = f"/annotators/"
+        annotators_url = f"annotators/"
         res = self.request(annotators_url)
         annotators = []
         for js in res['result']:
@@ -144,7 +159,7 @@ class LinalgoClient:
         return annotator
 
     def create_annotations(self, annotations):
-        url = '/annotations/'
+        url = 'annotations/'
         url = self.api_url + url
         headers = {'Authorization': f"Token {self.access_token}"}
         res = requests.post(url, json=annotations, headers=headers)
