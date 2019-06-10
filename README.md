@@ -1,4 +1,4 @@
-[![CircleCI](https://circleci.com/gh/linalgo/annotate-sdk.svg?style=svg&circle-token=ef87d896267f3200b095b04954eb8f382ccbd884)]
+![CircleCI](https://circleci.com/gh/linalgo/annotate-sdk.svg?style=svg&circle-token=ef87d896267f3200b095b04954eb8f382ccbd884)
 
 # linalgo-annotate
 
