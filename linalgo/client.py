@@ -17,6 +17,8 @@ def json2annotation(js):
             annotator=js['annotator'],
             document_id=js['document'],
             task_id=js['task'],
+            target=js['target'],
+            created=js['created']
         )
 
 

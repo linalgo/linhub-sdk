@@ -7,7 +7,8 @@ class Annotation:
     """
 
     def __init__(self, entity_id, body, annotator=None, task_id=None,
-                 score=None, document_id=None, annotation_id=None):
+                 score=None, document_id=None, annotation_id=None,
+                 target=None, created=None):
         self.id = annotation_id
         self.type_id = entity_id
         self.score = score
@@ -15,43 +16,20 @@ class Annotation:
         self.task_id = task_id
         self.annotator = annotator
         self.document_id = document_id
+        self.target = target
+        self.created = created
 
     def to_json(self):
-        if self.data is not None:
-            data = self.data
-        else:
-            data = {
-                "type_name": "UNKNOWN",
-                "group": self.task_id,
-                "target": [{
-                    "source": f"/tasks/{self.task_id}/annotate/{self.document_id}",
-                    "selector": []
-                }],
-                "type_id": self.type_id,
-                "text": "",
-                "created": "",
-                "display_options": {},
-                "uri": f"/tasks/{self.task_id}/annotate/{self.document_id}",
-                "tags": [],
-                "user": f"acct:{self.owner}@linalgo",
-                "permissions": {
-                    "read": [f"acct:{self.owner}@linalgo"],
-                    "update": [f"acct:{self.owner}@linalgo"],
-                    "delete": [f"acct:{self.owner}@linalgo"]
-                },
-                "id": 1,
-                "type_action": "default",
-                "type_flashcard_type": "default"
-            }
         js = {
-            'uri': self.uri,
+            # 'uri': self.uri,
             'type': self.type_id,
             'score': self.score,
-            'text': self.text,
-            'group': self.task_id,
+            # 'text': self.text,
+            'task': self.task_id,
             'annotator': self.annotator,
             'document': self.document_id,
-            'data': data
+            'target': self.target,
+            'created': self.created
             }
         return js
 
