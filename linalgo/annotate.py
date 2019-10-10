@@ -89,7 +89,8 @@ class Annotator:
     """
 
     def __init__(self, name, task=None, model=None, annotation_type_id=None,
-                 threshold=0):
+                 threshold=0, annotator_id=None):
+        self.id = annotator_id
         self.name = name
         self.task = task
         self.model = model
@@ -138,8 +139,8 @@ class Document:
     Base class that holds the document on which to perform annotations.
     """
 
-    def __init__(self, name, content, corpus=None, document_id=None):
-        self.name = name
+    def __init__(self, uri, content, corpus=None, document_id=None):
+        self.uri = uri
         self.content = content
         self.corpus = corpus
         self.id = document_id
@@ -225,6 +226,16 @@ class Task:
         else:
             # TODO: raise proper exception
             raise Exception('target should be `binary` or `multiclass`')
+
+    def get_name(self, some_id):
+        for a in self.annotators:
+            if a.id == some_id:
+                return a.name
+
+        for e in self.entities:
+            if e['id'] == some_id:
+                return e['title']
+        raise ValueError('{} was not found'.format(some_id))
 
     def __repr__(self):
         rep = (f"name: {self.name}\ndescription: {self.description}\n# "

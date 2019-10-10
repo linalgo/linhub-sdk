@@ -3,7 +3,7 @@ from linalgo.client import LinalgoClient
 
 def main():
 
-    token = "b65461c0c9766bab8fe5e714c5976528624b4d9b"
+    token = "62112085f16b6dc656f5a64029c286255fd286f6"
     api_url = "http://localhost:8000/hub"
     client = LinalgoClient(token=token, api_url=api_url)
 

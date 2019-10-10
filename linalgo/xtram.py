@@ -108,6 +108,7 @@ def plot_confusion_matrix(
     for al in als:
         xl = pd.DataFrame(al)
         xl = xl[[a for a in xl.columns if a in task.annotators]]
+        xl = xl.iloc[:, [0, 1]]
         xl.columns = ['a', 'b']
         xls.append(xl)
 

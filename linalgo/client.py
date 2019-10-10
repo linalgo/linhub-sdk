@@ -1,3 +1,5 @@
+from enum import Enum
+
 import requests
 
 from .annotate import Annotation, Annotator, Corpus, Document, Task
@@ -6,7 +8,8 @@ from .annotate import Annotation, Annotator, Corpus, Document, Task
 def json2annotator(js):
     return Annotator(
         name=js['name'],
-        annotator_id=js['id']
+        annotator_id=js['id'],
+        model=js['model']
     )
 
 
@@ -24,7 +27,7 @@ def json2annotation(js):
 
 def json2doc(js):
     return Document(
-        name=js['uri'],
+        uri=js['uri'],
         content=js['content'],
         corpus=js['corpus'],
         document_id=js['id']
@@ -42,22 +45,32 @@ def json2task(js):
     )
 
 
+class AssignmentType(Enum):
+    REVIEW = 'R'
+    LABEL = 'A'
+
+
+class AssignmentStatus(Enum):
+    ASSIGNED = 'A'
+    COMPLETED = 'C'
+
+
 class LinalgoClient:
 
     endpoints = {
-        'annotators': 'annotators/',
-        'corpora': 'corpora/',
-        'documents': 'documents/',
-        'entities': 'entities/',
-        'task': 'tasks/',
+        'annotators': 'annotators',
+        'annotations': 'annotations',
+        'corpora': 'corpora',
+        'documents': 'documents',
+        'entities': 'entities',
+        'task': 'tasks',
     }
 
     def __init__(self, token, api_url="http://localhost:8000"):
         self.api_url = api_url
         self.access_token = token
 
-    def request(self, endpoint, query_params={}):
-        url = '/'.join([self.api_url, endpoint])
+    def request(self, url, query_params={}):
         headers = {'Authorization': f"Token {self.access_token}"}
         res = requests.get(url, headers=headers, params=query_params)
         if res.status_code == 401:
@@ -86,7 +99,7 @@ class LinalgoClient:
         return corpus
 
     def get_corpus_documents(self, corpus_id):
-        url = f"/corpora/{corpus_id}/documents/?page_size=100000"
+        url = f"/corpora/{corpus_id}/documents/?page_size=1000"
         res = self.request(url)
         documents = []
         for js in res['results']:
@@ -103,30 +116,45 @@ class LinalgoClient:
                 task_ids.append(js['id'])
         for task_id in task_ids:
             task = self.get_task(task_id)
-            tasks.append(task)
+            tasks.extend(task)
         return tasks
 
     def get_task_documents(self, task_id):
-        query_params = {'corpus__tasks': task_id, 'page_size': 100000}
-        docs_json = self.request(self.endpoints['documents'], query_params)
-        return [json2doc(doc_json) for doc_json in docs_json['results']]
+        query_params = {'corpus__tasks': task_id, 'page_size': 1000}
+        docs = []
+        next_url = "{}/{}/".format(
+            self.api_url, self.endpoints['documents'])
+        while next_url:
+            res = self.request(next_url, query_params)
+            next_url = res['next']
+            docs.extend(res['results'])
+        return [json2doc(doc_json) for doc_json in docs]
 
     def get_task_annotations(self, task_id):
-        annotations_url = f"annotations/"
-        query_params = {'task': task_id, 'page_size': 100000}
-        ann_json = self.request(annotations_url, query_params)
-        return [json2annotation(a_json) for a_json in ann_json['results']]
+        query_params = {'task': task_id, 'page_size': 1000}
+        docs = []
+        next_url = "{}/{}/".format(self.api_url, self.endpoints['annotations'])
+        while next_url:
+            res = self.request(next_url, query_params)
+            next_url = res['next']
+            docs.extend(res['results'])
+        return [json2annotation(a_json) for a_json in docs]
 
     def get_task(self, task_id, verbose=False):
-        task_url = f"tasks/{task_id}/"
+        task_url = "{}/{}/{}/".format(
+            self.api_url, self.endpoints['task'], task_id)
         if verbose:
             print(f'Retrivieving task with id {task_id}...')
         task_json = self.request(task_url)
         task = json2task(task_json)
         if verbose:
+            print('Retrieving annotators...')
+        task.annotators = self.get_annotators(task)
+        if verbose:
             print('Retrieving entities...')
-        params = {'tasks': task.id, 'page_size': 100000}
-        entities_json = self.request(self.endpoints['entities'], params)
+        params = {'tasks': task.id, 'page_size': 1000}
+        entities_url = "{}/{}".format(self.api_url, self.endpoints['entities'])
+        entities_json = self.request(entities_url, params)
         task.entities = entities_json['results']
         if verbose:
             print('Retrieving documents...')
@@ -136,11 +164,13 @@ class LinalgoClient:
         task.annotations = self.get_task_annotations(task_id)
         return task
 
-    def get_annotators(self):
-        annotators_url = f"annotators/"
-        res = self.request(annotators_url)
+    def get_annotators(self, task=None):
+        params = {'tasks': task.id, 'page_size': 1000}
+        annotators_url = "{}/{}/".format(
+            self.api_url, self.endpoints['annotators'])
+        res = self.request(annotators_url, params)
         annotators = []
-        for js in res['result']:
+        for js in res['results']:
             annotator = json2annotator(js)
             annotators.append(annotator)
         return annotators
@@ -148,7 +178,8 @@ class LinalgoClient:
     def create_annotator(self, annotator):
         if annotator.annotator_id is not None:
             raise Exception("Annotator already has an ID.")
-        annotator_url = f"/annotators/"
+        annotator_url = "{}/{}/".format(
+            self.api_url, self.endpoints['annotators'])
         url = self.api_url + annotator_url
         headers = { 'Authorization': f"Token {self.access_token}"}
         annotator_json = {
@@ -161,8 +192,22 @@ class LinalgoClient:
         return annotator
 
     def create_annotations(self, annotations):
-        url = 'annotations/'
-        url = self.api_url + url
+        url = "{}/{}/".format(self.api_url, self.endpoints['annotations'])
         headers = {'Authorization': f"Token {self.access_token}"}
         res = requests.post(url, json=annotations, headers=headers)
+        return res
+
+    def assign(self, document, annotator, task, reviewee=None,
+               assignment_type=AssignmentType.LABEL.value):
+        doc_status = {
+            'status': AssignmentStatus.ASSIGNED.value,
+            'type': assignment_type,
+            'document': document,
+            'annotator': annotator,
+            'task': task,
+            'reviewee': reviewee
+        }
+        url = self.api_url + '/document-status/'
+        headers = {'Authorization': f"Token {self.access_token}"}
+        res = requests.post(url, doc_status, headers=headers)
         return res
