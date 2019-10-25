@@ -235,7 +235,7 @@ class Task:
         for e in self.entities:
             if e['id'] == some_id:
                 return e['title']
-        raise ValueError('{} was not found'.format(some_id))
+        return some_id
 
     def __repr__(self):
         rep = (f"name: {self.name}\ndescription: {self.description}\n# "

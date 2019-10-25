@@ -211,3 +211,19 @@ class LinalgoClient:
         headers = {'Authorization': f"Token {self.access_token}"}
         res = requests.post(url, doc_status, headers=headers)
         return res
+
+    def unassign(self, status_id):
+        headers = {'Authorization': f"Token {self.access_token}"}
+        url = "{}/{}/{}/".format(self.api_url, '/document-status/', status_id)
+        res = requests.delete(url, headers=headers)
+        return res
+
+    def get_schedule(self, task):
+        query_params = {'task': task.id, 'page_size': 1000}
+        docs = []
+        next_url = "{}/{}/".format(self.api_url, '/document-status/')
+        while next_url:
+            res = self.request(next_url, query_params=query_params)
+            next_url = res['next']
+            docs.extend(res['results'])
+        return docs
