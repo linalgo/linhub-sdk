@@ -237,6 +237,16 @@ class Task:
                 return e['title']
         return some_id
 
+    def get_id(self, name):
+        for a in self.annotators:
+            if a.name == name:
+                return a.id
+
+        for e in self.entities:
+            if e['title'] == name:
+                return e['id']
+        return name
+
     def __repr__(self):
         rep = (f"name: {self.name}\ndescription: {self.description}\n# "
                f"documents: {len(self.documents)}\n# annotations: "
