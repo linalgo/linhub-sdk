@@ -1,4 +1,5 @@
 from collections import defaultdict, MutableSequence
+import uuid
 
 
 class Annotation:
@@ -8,8 +9,10 @@ class Annotation:
 
     def __init__(self, entity_id, body, annotator=None, task_id=None,
                  score=None, document_id=None, annotation_id=None,
-                 target=None, created=None):
+                 target={}, created=None):
         self.id = annotation_id
+        if self.id is None:
+            self.id = uuid.uuid4()
         self.type_id = entity_id
         self.score = score
         self.body = body
@@ -21,15 +24,15 @@ class Annotation:
 
     def to_json(self):
         js = {
+            'id': str(self.id),
+            'entity': self.type_id,
             # 'uri': self.uri,
             'type': self.type_id,
-            'score': self.score,
             # 'text': self.text,
             'task': self.task_id,
             'annotator': self.annotator,
             'document': self.document_id,
             'target': self.target,
-            'created': self.created
             }
         return js
 

@@ -18,6 +18,25 @@ class Scheduler:
         self.task = task
         self.schedule = schedule
 
+    def unseen_documents(self, n):
+        """
+        Parameters
+        ----------
+
+        n: int
+            Number of unseen documents to return
+        """
+        annotated_docs = set(
+            annotation.to_json()['document'] for annotation in self.task.annotations)
+        docs = set(doc.id for doc in self.task.documents)
+        new_docs = list(docs - annotated_docs)
+
+        if len(new_docs) < n:
+            raise NotEnoughReviews()
+
+        return set(np.random.choice(new_docs, size=n, replace=False))
+
+
     def random_review(self, reviewer_id, reviewee_id, n=None):
         """
         Parameters
