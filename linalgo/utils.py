@@ -68,7 +68,7 @@ def plot_matrix(cm, xlabels=None, ylabels=None, title=None, cmap=plt.cm.Blues):
             ax.text(j, i, format(cm[i, j], fmt),
                     ha="center", va="center",
                     color="white" if cm[i, j] > thresh else "black")
-    fig.tight_layout()
+    # fig.tight_layout()
     return ax
 
 

@@ -1,5 +1,7 @@
 import numpy as np
-import pandas as pd
+
+from django.utils.dateparse import parse_datetime
+
 
 from .client import AssignmentStatus
 
@@ -17,6 +19,7 @@ class Scheduler:
     def __init__(self, task, schedule):
         self.task = task
         self.schedule = schedule
+        self.schedule['timestamp'] = schedule['timestamp'].apply(parse_datetime)
 
     def unseen_documents(self, n):
         """
@@ -36,8 +39,8 @@ class Scheduler:
 
         return set(np.random.choice(new_docs, size=n, replace=False))
 
-
-    def random_review(self, reviewer_id, reviewee_id, n=None):
+    def random_review(self, reviewer_id, reviewee_id, n=None, start_date=None,
+                      end_date=None):
         """
         Parameters
         ----------
@@ -47,24 +50,34 @@ class Scheduler:
             The uuid of the reviewee
         n: int
             The number of documents to review
+        start_date:
+            Filter reviewee annotations after `start_date`
+        end_date:
+            Filters reviewee annotations after `end_date`
 
         Return
         ------
         A set of documents to review
         """
-
+        schedule = self.schedule
+        if start_date is not None:
+            idx = (schedule['annotator'] == reviewee_id) & schedule['timestamp']
+            schedule = schedule[idx]
+        if end_date is not None:
+            idx = (schedule['annotator'] == reviewee_id) & schedule['timestamp']
+            schedule = schedule[idx]
         if (reviewer_id not in {a.id for a in self.task.annotators} or
             reviewee_id not in {a.id for a in self.task.annotators}):
             raise AnnotatorNotFound()
-        reviewer_idx = self.schedule['annotator'] == reviewer_id
-        reviewee_idx = self.schedule['annotator'] == reviewee_id
-        seen_idx = self.schedule['status'] == AssignmentStatus.COMPLETED.value
-        pending_idx = self.schedule['status'] == AssignmentStatus.ASSIGNED.value
+        reviewer_idx = schedule['annotator'] == reviewer_id
+        reviewee_idx = schedule['annotator'] == reviewee_id
+        seen_idx = schedule['status'] == AssignmentStatus.COMPLETED.value
+        pending_idx = schedule['status'] == AssignmentStatus.ASSIGNED.value
 
         idx = reviewer_idx & (seen_idx | pending_idx)
-        reviewer_docs = set(self.schedule.loc[idx, 'document'])
+        reviewer_docs = set(schedule.loc[idx, 'document'])
         idx = reviewee_idx & seen_idx
-        reviewee_docs = set(self.schedule.loc[idx, 'document'])
+        reviewee_docs = set(schedule.loc[idx, 'document'])
 
         pool = list(reviewee_docs - reviewer_docs)
         if n is not None:
