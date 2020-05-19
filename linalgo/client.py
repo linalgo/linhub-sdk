@@ -1,6 +1,10 @@
+import io
 from enum import Enum
-
+import codecs
+from contextlib import closing
+import csv
 import requests
+import pandas as pd
 
 from .annotate import Annotation, Annotator, Corpus, Document, Task
 
@@ -64,6 +68,8 @@ class LinalgoClient:
         'documents': 'documents',
         'entities': 'entities',
         'task': 'tasks',
+        'annotations-export': 'annotations/export',
+        'documents-export': 'documents/export',
     }
 
     def __init__(self, token, api_url="http://localhost:8000"):
@@ -80,6 +86,19 @@ class LinalgoClient:
         elif res.status_code != 200:
             raise Exception(f"Request returned status {res.status_code}")
         return res.json()
+
+    def request_csv(self, url, query_params={}):
+        headers = {'Authorization': f"Token {self.access_token}"}
+        # stream the file
+        with closing(requests.get(url, stream=True, headers=headers, params=query_params)) as res:
+            if res.status_code == 401:
+                raise Exception(f"Authentication failed. Please check your token.")
+            if res.status_code == 404:
+                raise Exception(f"{url} not found.")
+            elif res.status_code != 200:
+                raise Exception(f"Request returned status {res.status_code}")
+            df = pd.read_csv(io.BytesIO(res.content), compression='zip', header=0, sep=',', quotechar='"')
+            return df            
 
     def get_corpora(self):
         res = self.request(self.endpoints['corpora'])
@@ -120,25 +139,18 @@ class LinalgoClient:
         return tasks
 
     def get_task_documents(self, task_id):
-        query_params = {'corpus__tasks': task_id, 'page_size': 1000}
-        docs = []
-        next_url = "{}/{}/".format(
-            self.api_url, self.endpoints['documents'])
-        while next_url:
-            res = self.request(next_url, query_params)
-            next_url = res['next']
-            docs.extend(res['results'])
-        return [json2doc(doc_json) for doc_json in docs]
+        query_params = {'task_id': task_id, 'output_format': 'zip', 'only_documents': True}
+        api_url = "{}/{}/".format(self.api_url, self.endpoints['documents-export'])
+        res = self.request_csv(api_url, query_params)
+        data = [json2doc(row) for index, row in res.iterrows()]
+        return data
 
     def get_task_annotations(self, task_id):
-        query_params = {'task': task_id, 'page_size': 1000}
-        docs = []
-        next_url = "{}/{}/".format(self.api_url, self.endpoints['annotations'])
-        while next_url:
-            res = self.request(next_url, query_params)
-            next_url = res['next']
-            docs.extend(res['results'])
-        return [json2annotation(a_json) for a_json in docs]
+        query_params = {'task_id': task_id, 'output_format': 'zip'}
+        api_url = "{}/{}/".format(self.api_url, self.endpoints['annotations-export'])
+        res = self.request_csv(api_url, query_params)
+        data = [json2annotation(row) for index, row in res.iterrows()]
+        return data
 
     def get_task(self, task_id, verbose=False):
         task_url = "{}/{}/{}/".format(
