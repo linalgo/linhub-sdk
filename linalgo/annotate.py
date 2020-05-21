@@ -33,6 +33,7 @@ class Annotation:
             'annotator': self.annotator,
             'document': self.document_id,
             'target': self.target,
+            'created': self.created
             }
         return js
 
