@@ -1,9 +1,16 @@
 import io
 from enum import Enum
+<<<<<<< HEAD
 from contextlib import closing
 import csv
 import gzip
+=======
+import codecs
+from contextlib import closing
+import csv
+>>>>>>> 785c694f23730fe9584f8be44f73a5b1a25e77fe
 import requests
+import zipfile
 
 from .annotate import Annotation, Annotator, Corpus, Document, Task
 
@@ -89,6 +96,7 @@ class LinalgoClient:
     def request_csv(self, url, query_params={}):
         headers = {'Authorization': f"Token {self.access_token}"}
         # stream the file
+<<<<<<< HEAD
         with closing(requests.get(url, stream=True,  headers=headers,
                                   params=query_params)) as res:
             if res.status_code == 401:
@@ -102,6 +110,21 @@ class LinalgoClient:
             with gzip.GzipFile(fileobj=io.BytesIO(res.content)) as f:
                 records = list(csv.DictReader(io.TextIOWrapper(f, 'utf-8')))
             return records
+=======
+        with closing(requests.get(url, stream=True, 
+            headers=headers, params=query_params)) as res:
+            if res.status_code == 401:
+                raise Exception(f"Authentication failed. Please check your token.")
+            if res.status_code == 404:
+                raise Exception(f"{url} not found.")
+            elif res.status_code != 200:
+                raise Exception(f"Request returned status {res.status_code}")
+            root = zipfile.ZipFile(io.BytesIO(res.content))
+            data = []
+            f = root.namelist()
+            return csv.DictReader(io.TextIOWrapper(root.open(f[0]), 'utf-8')) \
+                if len(f) else []
+>>>>>>> 785c694f23730fe9584f8be44f73a5b1a25e77fe
 
     def get_corpora(self):
         res = self.request(self.endpoints['corpora'])
@@ -142,15 +165,21 @@ class LinalgoClient:
         return tasks
 
     def get_task_documents(self, task_id):
-        query_params = {'task_id': task_id, 'output_format': 'zip', 'only_documents': True}
-        api_url = "{}/{}/".format(self.api_url, self.endpoints['documents-export'])
+        query_params = {
+            'task_id': task_id,
+            'output_format': 'zip',
+            'only_documents': True
+        }
+        api_url = "{}/{}/".format(
+            self.api_url, self.endpoints['documents-export'])
         records = self.request_csv(api_url, query_params)
         data = [json2doc(row) for row in records]
         return data
 
     def get_task_annotations(self, task_id):
         query_params = {'task_id': task_id, 'output_format': 'zip'}
-        api_url = "{}/{}/".format(self.api_url, self.endpoints['annotations-export'])
+        api_url = "{}/{}/".format(
+            self.api_url, self.endpoints['annotations-export'])
         records = self.request_csv(api_url, query_params)
         data = [json2annotation(row) for row in records]
         return data
