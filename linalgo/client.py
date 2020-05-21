@@ -4,7 +4,7 @@ import codecs
 from contextlib import closing
 import csv
 import requests
-import pandas as pd
+import zipfile
 
 from .annotate import Annotation, Annotator, Corpus, Document, Task
 
@@ -90,15 +90,19 @@ class LinalgoClient:
     def request_csv(self, url, query_params={}):
         headers = {'Authorization': f"Token {self.access_token}"}
         # stream the file
-        with closing(requests.get(url, stream=True, headers=headers, params=query_params)) as res:
+        with closing(requests.get(url, stream=True, 
+            headers=headers, params=query_params)) as res:
             if res.status_code == 401:
                 raise Exception(f"Authentication failed. Please check your token.")
             if res.status_code == 404:
                 raise Exception(f"{url} not found.")
             elif res.status_code != 200:
                 raise Exception(f"Request returned status {res.status_code}")
-            df = pd.read_csv(io.BytesIO(res.content), compression='zip', header=0, sep=',', quotechar='"')
-            return df            
+            root = zipfile.ZipFile(io.BytesIO(res.content))
+            data = []
+            f = root.namelist()
+            return csv.DictReader(io.TextIOWrapper(root.open(f[0]), 'utf-8')) \
+                if len(f) else []
 
     def get_corpora(self):
         res = self.request(self.endpoints['corpora'])
@@ -142,14 +146,14 @@ class LinalgoClient:
         query_params = {'task_id': task_id, 'output_format': 'zip', 'only_documents': True}
         api_url = "{}/{}/".format(self.api_url, self.endpoints['documents-export'])
         res = self.request_csv(api_url, query_params)
-        data = [json2doc(row) for index, row in res.iterrows()]
+        data = [json2doc(row) for row in res]
         return data
 
     def get_task_annotations(self, task_id):
         query_params = {'task_id': task_id, 'output_format': 'zip'}
         api_url = "{}/{}/".format(self.api_url, self.endpoints['annotations-export'])
         res = self.request_csv(api_url, query_params)
-        data = [json2annotation(row) for index, row in res.iterrows()]
+        data = [json2annotation(row) for row in res]
         return data
 
     def get_task(self, task_id, verbose=False):
