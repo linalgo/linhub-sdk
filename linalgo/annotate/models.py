@@ -1,5 +1,18 @@
 from collections import defaultdict, MutableSequence
+from typing import Iterable, List, Union
 import uuid
+
+from linalgo.annotate.bbox import BoundingBox, Vertex
+
+Selector = Union[BoundingBox]
+
+
+class Target:
+
+    def __init__(self, source: 'Document' = None,
+                 selectors: List[Selector] = []):
+        self.source = source
+        self.selectors = selectors
 
 
 class Annotation:
@@ -7,38 +20,49 @@ class Annotation:
     Annotation class compatible with the W3C annotation data model.
     """
 
-    def __init__(self, entity_id, body, annotator=None, task_id=None,
-                 score=None, document_id=None, annotation_id=None,
-                 target={}, created=None):
-        self.id = annotation_id
-        if self.id is None:
-            self.id = uuid.uuid4()
-        self.type_id = entity_id
+    def __init__(
+            self, type: 'Entity', body: str, annotator: 'Annotator' = None,
+            task: 'Task' = None, document: 'Document' = None, created=None,
+            unique_id: str = None, target: Target = None,
+            score: float = None):
+        self.id = unique_id or uuid.uuid4()
+        self.type_id = type
         self.score = score
         self.body = body
-        self.task_id = task_id
+        self.task = task
         self.annotator = annotator
-        self.document_id = document_id
+        self.document = document
         self.target = target
         self.created = created
+
+    @staticmethod
+    def from_json(js):
+        return Annotation(
+            unique_id=js['id'] or None,
+            entity=Entity(unique_id=js['entity']),
+            body=js['body'],
+            annotator=Annotator(unique_id=js['annotator']),
+            document=Document(unique_id=js['document']),
+            task=Task(unique_id=js['task']),
+            target=js['target'],
+            created=js['created']
+        )
 
     def to_json(self):
         js = {
             'id': str(self.id),
-            'entity': self.type_id,
-            # 'uri': self.uri,
-            'type': self.type_id,
-            # 'text': self.text,
-            'task': self.task_id,
-            'annotator': self.annotator,
-            'document': self.document_id,
+            'entity': self.entity.id,
+            'body': self.body,
+            'task': self.task.id,
+            'annotator': self.annotator.id,
+            'document': self.document.id,
             'target': self.target,
             'created': self.created
-            }
+        }
         return js
 
     def __repr__(self):
-        return str(self.type_id)
+        return str(self.to_json())
 
 
 class Annotations(MutableSequence):
@@ -92,15 +116,24 @@ class Annotator:
     The Annotator class can create, delete or modify Annotations.
     """
 
-    def __init__(self, name, task=None, model=None, annotation_type_id=None,
-                 threshold=0, annotator_id=None):
-        self.id = annotator_id
+    def __init__(self, name: str, model=None, task: Task = None,
+                 annotation_type_id=None, threshold: float = 0,
+                 unique_id: str = None):
+        self.id = unique_id or uuid.uuid4()
         self.name = name
         self.task = task
         self.model = model
         self.type_id = annotation_type_id
         self.threshold = threshold
         self.annotator_id = None
+
+    @staticmethod
+    def from_json(js):
+        return Annotator(
+            name=js['name'],
+            annotator_id=js['id'],
+            model=js['model']
+        )
 
     def assign_task(self, task):
         self.task = task
@@ -112,7 +145,6 @@ class Annotator:
         else:
             label = 1  # Viewed
         annotation = Annotation(
-            uri=f'/tasks/{self.task.id}/annotate/{document.id}',
             type_id=label,
             score=score,
             text=document.content,
@@ -132,7 +164,8 @@ class Annotator:
 
 class Corpus:
 
-    def __init__(self, name, description, documents=[]):
+    def __init__(self, name: str, description: str,
+                 documents: Iterable['Document'] = []):
         self.name = name
         self.description = description
         self.documents = documents
@@ -143,12 +176,22 @@ class Document:
     Base class that holds the document on which to perform annotations.
     """
 
-    def __init__(self, uri, content, corpus=None, document_id=None):
+    def __init__(self, uri: str, content: str, corpus: Corpus = None,
+                 document_id: str = None):
         self.uri = uri
         self.content = content
         self.corpus = corpus
         self.id = document_id
         self._annotations = Annotations([])
+
+    @staticmethod
+    def from_json(js):
+        return Document(
+            uri=js['uri'],
+            content=js['content'],
+            corpus=Corpus(js['corpus']),
+            document_id=js['id']
+        )
 
     @property
     def labels(self):
@@ -165,7 +208,7 @@ class Document:
 
 class Entity:
 
-    def __initi__(self, name, entity_id=None):
+    def __init__(self, name: str, entity_id: str = None):
         self.id = entity_id
         self.name = name
 
@@ -176,10 +219,12 @@ class Task:
     annotations.
     """
 
-    def __init__(self, name, description, entities=None, corpora=None,
-                 annotators=None, annotations=Annotations([]), documents=[],
-                 task_id=None):
-        self.id = task_id
+    def __init__(
+            self, name: str = None, description: str = None,
+            entities: List[Entity] = [], corpora: List[Corpus] = [],
+            annotators: List[Annotator] = [], documents: List[Document] = [],
+            annotations: Iterable[Annotation] = [], task_id: str = None):
+        self.id = task_id or uuid.uuid4()
         self.name = name
         self.description = description
         self.entities = entities
@@ -187,6 +232,17 @@ class Task:
         self.annotators = annotators
         self._annotations = annotations
         self._documents = documents
+
+    @staticmethod
+    def from_json(js):
+        return Task(
+            name=js['name'],
+            description=js['description'],
+            entities=[Entity(e) for e in js['entities']],
+            corpora=[Corpus(c) for c in js['corpora']],
+            annotators=[Annotator(a) for a in js['annotators']],
+            task_id=js['id']
+        )
 
     @property
     def documents(self):

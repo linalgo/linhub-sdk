@@ -6,7 +6,8 @@ import csv
 import requests
 import zipfile
 
-from .annotate import Annotation, Annotator, Corpus, Document, Task
+from linalgo.annotate.models import Annotation, Annotator, Corpus, Document, \
+    Task
 
 
 def json2annotator(js):
