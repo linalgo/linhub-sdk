@@ -2,7 +2,7 @@ from collections import defaultdict, MutableSequence
 from typing import Iterable, List, Union
 import uuid
 
-from linalgo.annotate.bbox import BoundingBox, Vertex
+from linalgo.annotate.bbox import BoundingBox
 
 Selector = Union[BoundingBox]
 
@@ -10,35 +10,65 @@ Selector = Union[BoundingBox]
 class Target:
 
     def __init__(self, source: 'Document' = None,
-                 selectors: List[Selector] = []):
+                 selectors: Iterable[Selector] = []):
         self.source = source
         self.selectors = selectors
 
 
-class Annotation:
+class RegistryMixin:
+
+    def __new__(cls, *args, **kwargs):
+        unique_id = kwargs.get('unique_id', uuid.uuid1())
+        if not hasattr(cls, '_registry'):
+            cls._registry = dict()
+        if unique_id in cls._registry:
+            return cls._registry[unique_id]
+        else:
+            obj = super().__new__(cls)
+            obj.id = unique_id
+            return obj
+
+    def register(self):
+        self._registry[self.id] = self
+
+
+class FromIdFactoryMixin:
+
+    @classmethod
+    def factory(cls, arg):
+        if arg is None:
+            return None
+        elif type(arg) == cls:
+            return arg
+        elif type(arg) == str:
+            return cls(unique_id=arg)
+        else:
+            raise Exception(f'No factory method found for type {type(arg)}')
+
+
+class Annotation(RegistryMixin, FromIdFactoryMixin):
     """
     Annotation class compatible with the W3C annotation data model.
     """
 
-    def __init__(
-            self, type: 'Entity', body: str, annotator: 'Annotator' = None,
-            task: 'Task' = None, document: 'Document' = None, created=None,
-            unique_id: str = None, target: Target = None,
-            score: float = None):
-        self.id = unique_id or uuid.uuid4()
-        self.type_id = type
+    def __init__(self, entity: 'Entity' = None, body: str = None,
+                 annotator: 'Annotator' = None, task: 'Task' = None,
+                 document: 'Document' = None, created=None,
+                 target: Target = None, score: float = None, **kwargs):
+        self.entity = Entity.factory(entity)
         self.score = score
         self.body = body
-        self.task = task
-        self.annotator = annotator
-        self.document = document
+        self.task = Task.factory(task)
+        self.annotator = Annotator.factory(annotator)
+        self.document = Document.factory(document)
         self.target = target
         self.created = created
+        self.register()
 
     @staticmethod
     def from_json(js):
         return Annotation(
-            unique_id=js['id'] or None,
+            unique_id=js['id'],
             entity=Entity(unique_id=js['entity']),
             body=js['body'],
             annotator=Annotator(unique_id=js['annotator']),
@@ -48,21 +78,8 @@ class Annotation:
             created=js['created']
         )
 
-    def to_json(self):
-        js = {
-            'id': str(self.id),
-            'entity': self.entity.id,
-            'body': self.body,
-            'task': self.task.id,
-            'annotator': self.annotator.id,
-            'document': self.document.id,
-            'target': self.target,
-            'created': self.created
-        }
-        return js
-
     def __repr__(self):
-        return str(self.to_json())
+        return f'{self.id.hex}::{self.entity.name}'
 
 
 class Annotations(MutableSequence):
@@ -111,27 +128,28 @@ class Annotations(MutableSequence):
         self._type_index[val.type_id].append(val)
 
 
-class Annotator:
+class Annotator(RegistryMixin, FromIdFactoryMixin):
     """
     The Annotator class can create, delete or modify Annotations.
     """
 
-    def __init__(self, name: str, model=None, task: Task = None,
-                 annotation_type_id=None, threshold: float = 0,
-                 unique_id: str = None):
-        self.id = unique_id or uuid.uuid4()
+    def __init__(self, name: str = None, model=None, task: 'Task' = None,
+                 annotation_type_id=None, threshold: float = 0, **kwargs):
         self.name = name
-        self.task = task
+        self.task = Task.factory(task)
         self.model = model
         self.type_id = annotation_type_id
         self.threshold = threshold
-        self.annotator_id = None
+        self.register()
+
+    def __repr__(self):
+        return self.name or self.id.hex
 
     @staticmethod
     def from_json(js):
         return Annotator(
+            unique_id=js['id'],
             name=js['name'],
-            annotator_id=js['id'],
             model=js['model']
         )
 
@@ -162,27 +180,34 @@ class Annotator:
         return annotation
 
 
-class Corpus:
+class Corpus(RegistryMixin, FromIdFactoryMixin):
 
     def __init__(self, name: str, description: str,
-                 documents: Iterable['Document'] = []):
+                 documents: Iterable['Document'] = [], **kwargs):
         self.name = name
         self.description = description
-        self.documents = documents
+        self.documents = [Document.factory(d) for d in documents]
+        self.register()
+
+    def __repr__(self):
+        return self.name or self.id.hex
 
 
-class Document:
+class Document(RegistryMixin, FromIdFactoryMixin):
     """
     Base class that holds the document on which to perform annotations.
     """
 
-    def __init__(self, uri: str, content: str, corpus: Corpus = None,
-                 document_id: str = None):
+    def __init__(self, content: str = None, uri: str = None,
+                 corpus: Corpus = None, **kwargs):
         self.uri = uri
         self.content = content
-        self.corpus = corpus
-        self.id = document_id
+        self.corpus = Corpus.factory(corpus)
         self._annotations = Annotations([])
+        self.register()
+
+    def __repr__(self):
+        return self.id.hex
 
     @staticmethod
     def from_json(js):
@@ -206,14 +231,18 @@ class Document:
         self._annotations = Annotations(values)
 
 
-class Entity:
+class Entity(RegistryMixin, FromIdFactoryMixin):
 
-    def __init__(self, name: str, entity_id: str = None):
-        self.id = entity_id
-        self.name = name
+    def __init__(self, name: str = None, color: str = None, **kwargs):
+        self.name = name or self.id
+        self.color = color
+        self.register()
+
+    def __repr__(self):
+        return self.name or str(self.id)
 
 
-class Task:
+class Task(RegistryMixin, FromIdFactoryMixin):
     """
     The Task class contains all information about a task: entities, corpora, 
     annotations.
@@ -223,15 +252,18 @@ class Task:
             self, name: str = None, description: str = None,
             entities: List[Entity] = [], corpora: List[Corpus] = [],
             annotators: List[Annotator] = [], documents: List[Document] = [],
-            annotations: Iterable[Annotation] = [], task_id: str = None):
-        self.id = task_id or uuid.uuid4()
+            annotations: Iterable[Annotation] = [], **kwargs):
         self.name = name
         self.description = description
-        self.entities = entities
-        self.corpora = corpora
-        self.annotators = annotators
-        self._annotations = annotations
-        self._documents = documents
+        self.entities = [Entity.factory(e) for e in entities]
+        self.corpora = [Corpus.factory(c) for c in corpora]
+        self.annotators = [Annotator.factory(a) for a in annotators]
+        self._annotations = [Annotation.factory(a) for a in annotations]
+        self._documents = [Document.factory(d) for d in documents]
+        self.register()
+
+    def __repr__(self):
+        return str(self.id)
 
     @staticmethod
     def from_json(js):
@@ -306,11 +338,3 @@ class Task:
             if e['title'] == name:
                 return e['id']
         return name
-
-    def __repr__(self):
-        rep = (f"name: {self.name}\ndescription: {self.description}\n# "
-               f"documents: {len(self.documents)}\n# annotations: "
-               f"{len(self.annotations)}")
-        if self.id:
-            rep = f"id: {self.id}\n" + rep
-        return rep
