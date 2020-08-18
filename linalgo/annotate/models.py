@@ -1,5 +1,6 @@
 from collections import defaultdict, MutableSequence
 from typing import Dict, Iterable, List, Union
+import logging
 import uuid
 
 from linalgo.annotate.bbox import BoundingBox
@@ -39,9 +40,10 @@ class RegistryMixin:
         if attr is None:
             self.__setattr__(name, value)
             return True
-        elif value is not None:
+        elif value not in (None, []):
             self.__setattr__(name, value)
             return True
+        logging.info(f'Attribute {name} of {self} was not overridden')
         return False
 
 
@@ -96,7 +98,7 @@ class Annotation(RegistryMixin, FromIdFactoryMixin, AnnotationFactory):
         self.register()
 
     def __repr__(self):
-        return f'{self.id}::{self.entity.name}'
+        return f'Annotation::{self.entity.name}'
 
 
 class AnnotationList(MutableSequence):
@@ -171,7 +173,7 @@ class Annotator(RegistryMixin, FromIdFactoryMixin, AnnotatorFactory):
         self.register()
 
     def __repr__(self):
-        return self.name or self.id
+        return f'Annotator::{self.name or self.id}'
 
     def assign_task(self, task):
         self.task = task
@@ -210,7 +212,7 @@ class Corpus(RegistryMixin, FromIdFactoryMixin):
         self.register()
 
     def __repr__(self):
-        return self.name or self.id
+        return f'Corpus::{self.name or self.id}'
 
 
 class DocumentFactory:
@@ -239,7 +241,7 @@ class Document(RegistryMixin, FromIdFactoryMixin, DocumentFactory):
         self.register()
 
     def __repr__(self):
-        return self.id
+        return f'Document::{self.id}'
 
     @property
     def labels(self):
@@ -269,7 +271,7 @@ class Entity(RegistryMixin, FromIdFactoryMixin):
         self.register()
 
     def __repr__(self):
-        return self.name or str(self.id)
+        return f'Entity::{self.name or self.id}'
 
 
 class TaskFactory:
@@ -306,7 +308,7 @@ class Task(RegistryMixin, FromIdFactoryMixin, TaskFactory):
         self.register()
 
     def __repr__(self):
-        return str(self.id)
+        return f'Task::{str(self.id)}'
 
     @property
     def documents(self):
