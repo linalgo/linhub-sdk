@@ -1,4 +1,4 @@
-from linalgo.client import LinalgoClient
+from linalgo.hub.client import LinalgoClient
 
 
 def main():

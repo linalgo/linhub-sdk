@@ -3,7 +3,7 @@ import numpy as np
 from django.utils.dateparse import parse_datetime
 
 
-from .client import AssignmentStatus
+from linalgo.hub.client import AssignmentStatus
 
 
 class AnnotatorNotFound(Exception):
