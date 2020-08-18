@@ -1,5 +1,5 @@
 from collections import defaultdict, MutableSequence
-from typing import Iterable, List, Union
+from typing import Dict, Iterable, List, Union
 import uuid
 
 from linalgo.annotate.bbox import BoundingBox
@@ -18,7 +18,7 @@ class Target:
 class RegistryMixin:
 
     def __new__(cls, *args, **kwargs):
-        unique_id = kwargs.get('unique_id', uuid.uuid1())
+        unique_id = kwargs.get('unique_id', uuid.uuid4().hex)
         if not hasattr(cls, '_registry'):
             cls._registry = dict()
         if unique_id in cls._registry:
@@ -30,6 +30,19 @@ class RegistryMixin:
 
     def register(self):
         self._registry[self.id] = self
+
+    def setattr(self, name, value):
+        if not hasattr(self, name):
+            self.__setattr__(name, value)
+            return True
+        attr = self.__getattribute__(name)
+        if attr is None:
+            self.__setattr__(name, value)
+            return True
+        elif value is not None:
+            self.__setattr__(name, value)
+            return True
+        return False
 
 
 class FromIdFactoryMixin:
@@ -46,49 +59,53 @@ class FromIdFactoryMixin:
             raise Exception(f'No factory method found for type {type(arg)}')
 
 
-class Annotation(RegistryMixin, FromIdFactoryMixin):
+class AnnotationFactory:
+
+    @staticmethod
+    def from_dict(d: Dict):
+        return Annotation(
+            unique_id=d['id'],
+            entity=Entity(unique_id=d['entity']),
+            body=d['body'],
+            annotator=Annotator(unique_id=d['annotator']),
+            document=Document(unique_id=d['document']),
+            task=Task(unique_id=d['task']),
+            target=d['target'],
+            created=d['created']
+        )
+
+
+class Annotation(RegistryMixin, FromIdFactoryMixin, AnnotationFactory):
     """
     Annotation class compatible with the W3C annotation data model.
     """
 
-    def __init__(self, entity: 'Entity' = None, body: str = None,
+    def __init__(self, entity: 'Entity', document: 'Document', body: str = None,
                  annotator: 'Annotator' = None, task: 'Task' = None,
-                 document: 'Document' = None, created=None,
-                 target: Target = None, score: float = None, **kwargs):
-        self.entity = Entity.factory(entity)
-        self.score = score
-        self.body = body
-        self.task = Task.factory(task)
-        self.annotator = Annotator.factory(annotator)
-        self.document = Document.factory(document)
-        self.target = target
-        self.created = created
+                 created=None, target: Target = None, score: float = None,
+                 **kwargs):
+        self.setattr('entity', Entity.factory(entity))
+        self.setattr('score', score)
+        self.setattr('body', body)
+        self.setattr('task', Task.factory(task))
+        self.setattr('annotator', Annotator.factory(annotator))
+        self.setattr('document', Document.factory(document))
+        self.document.add_annotation(self)
+        self.setattr('target', target)
+        self.setattr('created', created)
         self.register()
 
-    @staticmethod
-    def from_json(js):
-        return Annotation(
-            unique_id=js['id'],
-            entity=Entity(unique_id=js['entity']),
-            body=js['body'],
-            annotator=Annotator(unique_id=js['annotator']),
-            document=Document(unique_id=js['document']),
-            task=Task(unique_id=js['task']),
-            target=js['target'],
-            created=js['created']
-        )
-
     def __repr__(self):
-        return f'{self.id.hex}::{self.entity.name}'
+        return f'{self.id}::{self.entity.name}'
 
 
-class Annotations(MutableSequence):
+class AnnotationList(MutableSequence):
     """
     Class to list of annotations with custom indexing.
     """
 
     def __init__(self, annotations=None):
-        super(Annotations, self).__init__()
+        super(AnnotationList, self).__init__()
         self._list = []
         self._user_index = defaultdict(list)
         self._type_index = defaultdict(list)
@@ -125,33 +142,36 @@ class Annotations(MutableSequence):
     def append(self, val):
         self.insert(len(self._list), val)
         self._user_index[val.annotator].append(val)
-        self._type_index[val.type_id].append(val)
+        self._type_index[val.entity.id].append(val)
 
 
-class Annotator(RegistryMixin, FromIdFactoryMixin):
+class AnnotatorFactory:
+
+    @staticmethod
+    def from_dict(js):
+        return Annotator(
+            unique_id=js['id'],
+            name=js['name'],
+            model=js['model']
+        )
+
+
+class Annotator(RegistryMixin, FromIdFactoryMixin, AnnotatorFactory):
     """
     The Annotator class can create, delete or modify Annotations.
     """
 
     def __init__(self, name: str = None, model=None, task: 'Task' = None,
                  annotation_type_id=None, threshold: float = 0, **kwargs):
-        self.name = name
-        self.task = Task.factory(task)
-        self.model = model
-        self.type_id = annotation_type_id
-        self.threshold = threshold
+        self.setattr('name', name)
+        self.setattr('task', Task.factory(task))
+        self.setattr('model', model)
+        self.setattr('type_id', annotation_type_id)
+        self.setattr('threshold', threshold)
         self.register()
 
     def __repr__(self):
-        return self.name or self.id.hex
-
-    @staticmethod
-    def from_json(js):
-        return Annotator(
-            unique_id=js['id'],
-            name=js['name'],
-            model=js['model']
-        )
+        return self.name or self.id
 
     def assign_task(self, task):
         self.task = task
@@ -166,7 +186,7 @@ class Annotator(RegistryMixin, FromIdFactoryMixin):
             type_id=label,
             score=score,
             text=document.content,
-            annotator=self.annotator_id,
+            annotator=self.id,
             task_id=self.task.id,
             document_id=document.id
         )
@@ -182,41 +202,44 @@ class Annotator(RegistryMixin, FromIdFactoryMixin):
 
 class Corpus(RegistryMixin, FromIdFactoryMixin):
 
-    def __init__(self, name: str, description: str,
+    def __init__(self, name: str = None, description: str = None,
                  documents: Iterable['Document'] = [], **kwargs):
-        self.name = name
-        self.description = description
-        self.documents = [Document.factory(d) for d in documents]
+        self.setattr('name', name)
+        self.setattr('description', description)
+        self.setattr('documents', [Document.factory(d) for d in documents])
         self.register()
 
     def __repr__(self):
-        return self.name or self.id.hex
+        return self.name or self.id
 
 
-class Document(RegistryMixin, FromIdFactoryMixin):
+class DocumentFactory:
+
+    @staticmethod
+    def from_dict(d):
+        return Document(
+            uri=d['uri'],
+            content=d['content'],
+            corpus=Corpus(d['corpus']),
+            document_id=d['id']
+        )
+
+
+class Document(RegistryMixin, FromIdFactoryMixin, DocumentFactory):
     """
     Base class that holds the document on which to perform annotations.
     """
 
     def __init__(self, content: str = None, uri: str = None,
                  corpus: Corpus = None, **kwargs):
-        self.uri = uri
-        self.content = content
-        self.corpus = Corpus.factory(corpus)
-        self._annotations = Annotations([])
+        self.setattr('uri', uri)
+        self.setattr('content', content)
+        self.setattr('corpus', Corpus.factory(corpus))
+        self._annotations = AnnotationList([])
         self.register()
 
     def __repr__(self):
-        return self.id.hex
-
-    @staticmethod
-    def from_json(js):
-        return Document(
-            uri=js['uri'],
-            content=js['content'],
-            corpus=Corpus(js['corpus']),
-            document_id=js['id']
-        )
+        return self.id
 
     @property
     def labels(self):
@@ -228,21 +251,41 @@ class Document(RegistryMixin, FromIdFactoryMixin):
 
     @annotations.setter
     def annotations(self, values):
-        self._annotations = Annotations(values)
+        self._annotations = AnnotationList(values)
+
+    def add_annotation(self, annotation: Annotation):
+        for a in self.annotations:
+            if annotation.id == a.id:
+                return False
+        self.annotations.append(annotation)
+        return True
 
 
 class Entity(RegistryMixin, FromIdFactoryMixin):
 
     def __init__(self, name: str = None, color: str = None, **kwargs):
-        self.name = name or self.id
-        self.color = color
+        self.setattr('name', name or self.id)
+        self.setattr('color', color)
         self.register()
 
     def __repr__(self):
         return self.name or str(self.id)
 
 
-class Task(RegistryMixin, FromIdFactoryMixin):
+class TaskFactory:
+    @staticmethod
+    def from_dict(d):
+        return Task(
+            unique_id=d['id'],
+            name=d['name'],
+            description=d['description'],
+            entities=[Entity(e) for e in d['entities']],
+            corpora=[Corpus(c) for c in d['corpora']],
+            annotators=[Annotator(a) for a in d['annotators']],
+        )
+
+
+class Task(RegistryMixin, FromIdFactoryMixin, TaskFactory):
     """
     The Task class contains all information about a task: entities, corpora, 
     annotations.
@@ -253,28 +296,17 @@ class Task(RegistryMixin, FromIdFactoryMixin):
             entities: List[Entity] = [], corpora: List[Corpus] = [],
             annotators: List[Annotator] = [], documents: List[Document] = [],
             annotations: Iterable[Annotation] = [], **kwargs):
-        self.name = name
-        self.description = description
-        self.entities = [Entity.factory(e) for e in entities]
-        self.corpora = [Corpus.factory(c) for c in corpora]
-        self.annotators = [Annotator.factory(a) for a in annotators]
+        self.setattr('name', name)
+        self.setattr('description', description)
+        self.setattr('entities', [Entity.factory(e) for e in entities])
+        self.setattr('corpora', [Corpus.factory(c) for c in corpora])
+        self.setattr('annotators', [Annotator.factory(a) for a in annotators])
         self._annotations = [Annotation.factory(a) for a in annotations]
         self._documents = [Document.factory(d) for d in documents]
         self.register()
 
     def __repr__(self):
         return str(self.id)
-
-    @staticmethod
-    def from_json(js):
-        return Task(
-            name=js['name'],
-            description=js['description'],
-            entities=[Entity(e) for e in js['entities']],
-            corpora=[Corpus(c) for c in js['corpora']],
-            annotators=[Annotator(a) for a in js['annotators']],
-            task_id=js['id']
-        )
 
     @property
     def documents(self):
@@ -290,9 +322,9 @@ class Task(RegistryMixin, FromIdFactoryMixin):
 
     @annotations.setter
     def annotations(self, values):
-        self._annotations = Annotations(values)
+        self._annotations = AnnotationList(values)
         for annotation in self.annotations:
-            doc_id = annotation.document_id
+            doc_id = annotation.document.id
             if doc_id in self._documents:
                 self._documents[doc_id].annotations.append(annotation)
             else:

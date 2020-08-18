@@ -10,46 +10,6 @@ from linalgo.annotate.models import Annotation, Annotator, Corpus, Document, \
     Task
 
 
-def json2annotator(js):
-    return Annotator(
-        name=js['name'],
-        annotator_id=js['id'],
-        model=js['model']
-    )
-
-
-def json2annotation(js):
-    return Annotation(
-            entity_id=js['entity'],
-            body=js['body'],
-            annotator=js['annotator'],
-            document_id=js['document'],
-            task_id=js['task'],
-            target=js['target'],
-            created=js['created']
-        )
-
-
-def json2doc(js):
-    return Document(
-        uri=js['uri'],
-        content=js['content'],
-        corpus=js['corpus'],
-        document_id=js['id']
-    )
-
-
-def json2task(js):
-    return Task(
-        name=js['name'],
-        description=js['description'],
-        entities=js['entities'],
-        corpora=js['corpora'],
-        annotators=js['annotators'],
-        task_id=js['id']
-    )
-
-
 class AssignmentType(Enum):
     REVIEW = 'R'
     LABEL = 'A'
@@ -85,7 +45,7 @@ class LinalgoClient:
         if res.status_code == 404:
             raise Exception(f"{url} not found.")
         elif res.status_code != 200:
-            raise Exception(f"Request returned status {res.status_code}")
+            raise Exception(f"Request returned status {res.status_code}, {res.content}")
         return res.json()
 
     def request_csv(self, url, query_params={}):
@@ -128,8 +88,8 @@ class LinalgoClient:
         url = f"/corpora/{corpus_id}/documents/?page_size=1000"
         res = self.request(url)
         documents = []
-        for js in res['results']:
-            document = json2doc(js)
+        for d in res['results']:
+            document = Document.from_dict(d)
             documents.append(document)
         return documents
 
@@ -154,7 +114,7 @@ class LinalgoClient:
         api_url = "{}/{}/".format(
             self.api_url, self.endpoints['documents-export'])
         records = self.request_csv(api_url, query_params)
-        data = [json2doc(row) for row in records]
+        data = [Document.from_dict(row) for row in records]
         return data
 
     def get_task_annotations(self, task_id):
@@ -162,7 +122,7 @@ class LinalgoClient:
         api_url = "{}/{}/".format(
             self.api_url, self.endpoints['annotations-export'])
         records = self.request_csv(api_url, query_params)
-        data = [json2annotation(row) for row in records]
+        data = [Annotation.from_dict(row) for row in records]
         return data
 
     def get_task(self, task_id, verbose=False):
@@ -171,13 +131,13 @@ class LinalgoClient:
         if verbose:
             print(f'Retrivieving task with id {task_id}...')
         task_json = self.request(task_url)
-        task = json2task(task_json)
+        task = Task.from_dict(task_json)
         if verbose:
             print('Retrieving annotators...')
         task.annotators = self.get_annotators(task)
         if verbose:
             print('Retrieving entities...')
-        params = {'tasks': task.id, 'page_size': 1000}
+        params = {'task': task.id, 'page_size': 1000}
         entities_url = "{}/{}".format(self.api_url, self.endpoints['entities'])
         entities_json = self.request(entities_url, params)
         task.entities = entities_json['results']
@@ -190,13 +150,13 @@ class LinalgoClient:
         return task
 
     def get_annotators(self, task=None):
-        params = {'tasks': task.id, 'page_size': 1000}
+        params = {'task': task.id, 'page_size': 1000}
         annotators_url = "{}/{}/".format(
             self.api_url, self.endpoints['annotators'])
         res = self.request(annotators_url, params)
         annotators = []
-        for js in res['results']:
-            annotator = json2annotator(js)
+        for a in res['results']:
+            annotator = Annotator.from_dict(a)
             annotators.append(annotator)
         return annotators
 
