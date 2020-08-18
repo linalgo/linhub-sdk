@@ -7,7 +7,7 @@ import requests
 import zipfile
 
 from linalgo.annotate.models import Annotation, Annotator, Corpus, Document, \
-    Task
+    Entity, Task
 
 
 class AssignmentType(Enum):
@@ -137,10 +137,10 @@ class LinalgoClient:
         task.annotators = self.get_annotators(task)
         if verbose:
             print('Retrieving entities...')
-        params = {'task': task.id, 'page_size': 1000}
+        params = {'tasks': task.id, 'page_size': 1000}
         entities_url = "{}/{}".format(self.api_url, self.endpoints['entities'])
         entities_json = self.request(entities_url, params)
-        task.entities = entities_json['results']
+        task.entities = [Entity.from_dict(e) for e in entities_json['results']]
         if verbose:
             print('Retrieving documents...')
         task.documents = self.get_task_documents(task_id)

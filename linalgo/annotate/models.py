@@ -98,7 +98,7 @@ class Annotation(RegistryMixin, FromIdFactoryMixin, AnnotationFactory):
         self.register()
 
     def __repr__(self):
-        return f'Annotation::{self.entity.name}'
+        return f'Annotation::{self.entity.name or self.entity.id}'
 
 
 class AnnotationList(MutableSequence):
@@ -263,10 +263,21 @@ class Document(RegistryMixin, FromIdFactoryMixin, DocumentFactory):
         return True
 
 
-class Entity(RegistryMixin, FromIdFactoryMixin):
+class EntityFactory:
+
+    @staticmethod
+    def from_dict(d: Dict):
+        return Entity(
+            unique_id=d['id'],
+            name=d['title'],
+            color=d['color']
+        )
+
+
+class Entity(RegistryMixin, FromIdFactoryMixin, EntityFactory):
 
     def __init__(self, name: str = None, color: str = None, **kwargs):
-        self.setattr('name', name or self.id)
+        self.setattr('name', name)
         self.setattr('color', color)
         self.register()
 
