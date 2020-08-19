@@ -114,7 +114,7 @@ class LinalgoClient:
         api_url = "{}/{}/".format(
             self.api_url, self.endpoints['documents-export'])
         records = self.request_csv(api_url, query_params)
-        data = [Document.from_dict(row) for row in records]
+        data = set(Document.from_dict(row) for row in records)
         return data
 
     def get_task_annotations(self, task_id):
@@ -122,7 +122,7 @@ class LinalgoClient:
         api_url = "{}/{}/".format(
             self.api_url, self.endpoints['annotations-export'])
         records = self.request_csv(api_url, query_params)
-        data = [Annotation.from_dict(row) for row in records]
+        data = set(Annotation.from_dict(row) for row in records)
         return data
 
     def get_task(self, task_id, verbose=False):
