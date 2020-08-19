@@ -93,13 +93,13 @@ def draw_bounding_boxes(image: Image, annotations: List):
     """
     draw = ImageDraw.Draw(image)
     for annotation in annotations:
-        box = annotation['bbox']
+        box = annotation.target.selectors[0]
         draw.polygon([
             box.vertices[0].x, box.vertices[0].y,
             box.vertices[1].x, box.vertices[1].y,
             box.vertices[2].x, box.vertices[2].y,
             box.vertices[3].x, box.vertices[3].y],
-            None, annotation['color'])
+            None, f'#{annotation.entity.color}')
     return image
 
 

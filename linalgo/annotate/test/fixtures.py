@@ -20,3 +20,13 @@ ANNOTATIONS = [
         "task": "68297d90-8979-4010-b961-d72360390011"
     }
 ]
+
+DOCUMENTS = [
+ {
+     "id": "926c0143-1d36-4e81-87b5-fd17f2f43d17",
+     "uri": "5454",
+     "title": None,
+     "content": "skillful",
+     "corpus": "788658a1-1f4f-4e40-86f7-7d65cde29438"
+ }
+]

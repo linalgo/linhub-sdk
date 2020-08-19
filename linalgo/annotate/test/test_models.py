@@ -1,7 +1,7 @@
 import unittest
 
-from linalgo.annotate.models import Annotation
-from .fixtures import ANNOTATIONS
+from linalgo.annotate.models import Annotation, Document
+from .fixtures import ANNOTATIONS, DOCUMENTS
 
 
 class TestModels(unittest.TestCase):
@@ -35,6 +35,13 @@ class TestModels(unittest.TestCase):
         )
         a2 = Annotation.from_dict(fixture)
         self.assertEqual(a1, a2)
+
+    def test_document(self):
+        doc_fixture = DOCUMENTS[0]
+        anno_fixture = ANNOTATIONS[0]
+        doc = Document.from_dict(doc_fixture)
+        anno = Annotation.from_dict(anno_fixture)
+        self.assertEqual(doc, anno.document)
 
 
 if __name__ == '__main__':

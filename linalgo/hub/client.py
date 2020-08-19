@@ -7,7 +7,7 @@ import requests
 import zipfile
 
 from linalgo.annotate.models import Annotation, Annotator, Corpus, Document, \
-    Task
+    Entity, Task
 
 
 class AssignmentType(Enum):
@@ -114,7 +114,7 @@ class LinalgoClient:
         api_url = "{}/{}/".format(
             self.api_url, self.endpoints['documents-export'])
         records = self.request_csv(api_url, query_params)
-        data = [Document.from_dict(row) for row in records]
+        data = set(Document.from_dict(row) for row in records)
         return data
 
     def get_task_annotations(self, task_id):
@@ -122,7 +122,7 @@ class LinalgoClient:
         api_url = "{}/{}/".format(
             self.api_url, self.endpoints['annotations-export'])
         records = self.request_csv(api_url, query_params)
-        data = [Annotation.from_dict(row) for row in records]
+        data = set(Annotation.from_dict(row) for row in records)
         return data
 
     def get_task(self, task_id, verbose=False):
@@ -137,10 +137,10 @@ class LinalgoClient:
         task.annotators = self.get_annotators(task)
         if verbose:
             print('Retrieving entities...')
-        params = {'task': task.id, 'page_size': 1000}
+        params = {'tasks': task.id, 'page_size': 1000}
         entities_url = "{}/{}".format(self.api_url, self.endpoints['entities'])
         entities_json = self.request(entities_url, params)
-        task.entities = entities_json['results']
+        task.entities = [Entity.from_dict(e) for e in entities_json['results']]
         if verbose:
             print('Retrieving documents...')
         task.documents = self.get_task_documents(task_id)

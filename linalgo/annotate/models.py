@@ -1,14 +1,64 @@
-from collections import defaultdict, MutableSequence
 from typing import Dict, Iterable, List, Union
+import json
 import logging
 import uuid
 
-from linalgo.annotate.bbox import BoundingBox
+from linalgo.annotate.bbox import BoundingBox, Vertex
+
 
 Selector = Union[BoundingBox]
 
 
-class Target:
+class SelectorFactory:
+
+    @staticmethod
+    def factory(d: Dict):
+        if 'x' in d:
+            v = Vertex(d['x'], d['y'])
+            return BoundingBox.fromVertex(
+                v, height=d['height'], width=d['width'])
+        elif 'startOffset' in d:
+            return XPathSelector(
+                start_container=d['startContainer'],
+                end_container=d['endContainer'],
+                start_offset=d['startOffset'],
+                end_offset=d['endOffset']
+            )
+        return None
+
+
+class XPathSelector:
+
+    def __init__(self, start_container: str, end_container: str,
+                 start_offset: int, end_offset: int):
+        self.start_container = start_container
+        self.end_container = end_container
+        self.start_offset = start_offset
+        self.end_offset = end_offset
+
+
+class TargetFactory:
+
+    @staticmethod
+    def factory(data):
+        if type(data) == Target:
+            return data
+        elif type(data) == str:
+            d = json.loads(data.replace("\'", "\""))
+            return TargetFactory.from_dict(d)
+        elif type(data) == dict:
+            return TargetFactory.from_dict(data)
+        raise NotImplementedError(f'No factory found for type {type(data)}')
+
+    @staticmethod
+    def from_dict(d: Dict):
+        return Target(
+            source=Document.factory(d['source']),
+            selectors=[SelectorFactory.factory(s) for s in d['selector']]
+        )
+
+
+class Target(TargetFactory):
 
     def __init__(self, source: 'Document' = None,
                  selectors: Iterable[Selector] = []):
@@ -20,6 +70,7 @@ class RegistryMixin:
 
     def __new__(cls, *args, **kwargs):
         unique_id = kwargs.get('unique_id', uuid.uuid4().hex)
+        # unique_id = uuid.UUID(unique_id).hex
         if not hasattr(cls, '_registry'):
             cls._registry = dict()
         if unique_id in cls._registry:
@@ -40,7 +91,7 @@ class RegistryMixin:
         if attr is None:
             self.__setattr__(name, value)
             return True
-        elif value not in (None, []):
+        elif value not in (None, [], set()):
             self.__setattr__(name, value)
             return True
         logging.info(f'Attribute {name} of {self} was not overridden')
@@ -72,7 +123,7 @@ class AnnotationFactory:
             annotator=Annotator(unique_id=d['annotator']),
             document=Document(unique_id=d['document']),
             task=Task(unique_id=d['task']),
-            target=d['target'],
+            target=Target.factory(d['target']),
             created=d['created']
         )
 
@@ -92,59 +143,13 @@ class Annotation(RegistryMixin, FromIdFactoryMixin, AnnotationFactory):
         self.setattr('task', Task.factory(task))
         self.setattr('annotator', Annotator.factory(annotator))
         self.setattr('document', Document.factory(document))
-        self.document.add_annotation(self)
-        self.setattr('target', target)
+        self.document.annotations.add(self)
+        self.setattr('target', TargetFactory.factory(target))
         self.setattr('created', created)
         self.register()
 
     def __repr__(self):
-        return f'Annotation::{self.entity.name}'
-
-
-class AnnotationList(MutableSequence):
-    """
-    Class to list of annotations with custom indexing.
-    """
-
-    def __init__(self, annotations=None):
-        super(AnnotationList, self).__init__()
-        self._list = []
-        self._user_index = defaultdict(list)
-        self._type_index = defaultdict(list)
-        for annotation in annotations:
-            self.append(annotation)
-
-    def get_users(self):
-        return self._user_index.keys()
-
-    def by_user(self, name):
-        return self._user_index[name]
-
-    def __repr__(self):
-        return "<{0} {1}>".format(self.__class__.__name__, self._list)
-
-    def __len__(self):
-        return len(self._list)
-
-    def __getitem__(self, ii):
-        return self._list[ii]
-
-    def __delitem__(self, ii):
-        del self._list[ii]
-
-    def __setitem__(self, ii, val):
-        self._list[ii] = val
-
-    def __str__(self):
-        return str(self._list)
-
-    def insert(self, ii, val):
-        self._list.insert(ii, val)
-
-    def append(self, val):
-        self.insert(len(self._list), val)
-        self._user_index[val.annotator].append(val)
-        self._type_index[val.entity.id].append(val)
+        return f'Annotation::{self.entity.name or self.entity.id}'
 
 
 class AnnotatorFactory:
@@ -220,10 +225,10 @@ class DocumentFactory:
     @staticmethod
     def from_dict(d):
         return Document(
+            unique_id=d['id'],
             uri=d['uri'],
             content=d['content'],
-            corpus=Corpus(d['corpus']),
-            document_id=d['id']
+            corpus=Corpus(d['corpus'])
         )
 
 
@@ -237,36 +242,28 @@ class Document(RegistryMixin, FromIdFactoryMixin, DocumentFactory):
         self.setattr('uri', uri)
         self.setattr('content', content)
         self.setattr('corpus', Corpus.factory(corpus))
-        self._annotations = AnnotationList([])
+        self.setattr('annotations', set())
         self.register()
 
     def __repr__(self):
         return f'Document::{self.id}'
 
-    @property
-    def labels(self):
-        return set(annotation.type_id for annotation in self.annotations)
 
-    @property
-    def annotations(self):
-        return self._annotations
+class EntityFactory:
 
-    @annotations.setter
-    def annotations(self, values):
-        self._annotations = AnnotationList(values)
-
-    def add_annotation(self, annotation: Annotation):
-        for a in self.annotations:
-            if annotation.id == a.id:
-                return False
-        self.annotations.append(annotation)
-        return True
+    @staticmethod
+    def from_dict(d: Dict):
+        return Entity(
+            unique_id=d['id'],
+            name=d['title'],
+            color=d['color']
+        )
 
 
-class Entity(RegistryMixin, FromIdFactoryMixin):
+class Entity(RegistryMixin, FromIdFactoryMixin, EntityFactory):
 
     def __init__(self, name: str = None, color: str = None, **kwargs):
-        self.setattr('name', name or self.id)
+        self.setattr('name', name)
         self.setattr('color', color)
         self.register()
 
@@ -303,35 +300,20 @@ class Task(RegistryMixin, FromIdFactoryMixin, TaskFactory):
         self.setattr('entities', [Entity.factory(e) for e in entities])
         self.setattr('corpora', [Corpus.factory(c) for c in corpora])
         self.setattr('annotators', [Annotator.factory(a) for a in annotators])
-        self._annotations = [Annotation.factory(a) for a in annotations]
-        self._documents = [Document.factory(d) for d in documents]
+        self.setattr('annotations', {Annotation.factory(a) for a in annotations})
+        self.setattr('documents', {Document.factory(d) for d in documents})
+        self.setattr('annotations', annotations)
+        self.setattr('documents', documents)
         self.register()
 
     def __repr__(self):
         return f'Task::{str(self.id)}'
 
-    @property
-    def documents(self):
-        return list(self._documents.values())
+    def add_annotation(self, annotation: Annotation):
+        self.annotations.add(annotation)
 
-    @documents.setter
-    def documents(self, values):
-        self._documents = dict((doc.id, doc) for doc in values)
-
-    @property
-    def annotations(self):
-        return self._annotations
-
-    @annotations.setter
-    def annotations(self, values):
-        self._annotations = AnnotationList(values)
-        for annotation in self.annotations:
-            doc_id = annotation.document.id
-            if doc_id in self._documents:
-                self._documents[doc_id].annotations.append(annotation)
-            else:
-                # TODO: Investigate the reason for this
-                pass
+    def add_document(self, document: Document):
+        self.documents.add(document)
 
     def transform(self, target='binary', label=None):
         docs = []
@@ -352,23 +334,3 @@ class Task(RegistryMixin, FromIdFactoryMixin, TaskFactory):
         else:
             # TODO: raise proper exception
             raise Exception('target should be `binary` or `multiclass`')
-
-    def get_name(self, some_id):
-        for a in self.annotators:
-            if a.id == some_id:
-                return a.name
-
-        for e in self.entities:
-            if e['id'] == some_id:
-                return e['title']
-        return some_id
-
-    def get_id(self, name):
-        for a in self.annotators:
-            if a.name == name:
-                return a.id
-
-        for e in self.entities:
-            if e['title'] == name:
-                return e['id']
-        return name
