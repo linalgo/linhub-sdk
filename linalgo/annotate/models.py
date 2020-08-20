@@ -143,7 +143,7 @@ class Annotation(RegistryMixin, FromIdFactoryMixin, AnnotationFactory):
         self.setattr('task', Task.factory(task))
         self.setattr('annotator', Annotator.factory(annotator))
         self.setattr('document', Document.factory(document))
-        self.document.annotations.add(self)
+        self.document.annotations.append(self)
         self.setattr('target', TargetFactory.factory(target))
         self.setattr('created', created)
         self.register()
@@ -242,7 +242,7 @@ class Document(RegistryMixin, FromIdFactoryMixin, DocumentFactory):
         self.setattr('uri', uri)
         self.setattr('content', content)
         self.setattr('corpus', Corpus.factory(corpus))
-        self.setattr('annotations', set())
+        self.setattr('annotations', [])
         self.register()
 
     def __repr__(self):
@@ -300,10 +300,8 @@ class Task(RegistryMixin, FromIdFactoryMixin, TaskFactory):
         self.setattr('entities', [Entity.factory(e) for e in entities])
         self.setattr('corpora', [Corpus.factory(c) for c in corpora])
         self.setattr('annotators', [Annotator.factory(a) for a in annotators])
-        self.setattr('annotations', {Annotation.factory(a) for a in annotations})
-        self.setattr('documents', {Document.factory(d) for d in documents})
-        self.setattr('annotations', annotations)
-        self.setattr('documents', documents)
+        self.setattr('annotations', [Annotation.factory(a) for a in annotations])
+        self.setattr('documents', [Document.factory(d) for d in documents])
         self.register()
 
     def __repr__(self):
