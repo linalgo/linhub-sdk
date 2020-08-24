@@ -52,6 +52,8 @@ class TargetFactory:
 
     @staticmethod
     def from_dict(d: Dict):
+        if d == {}:
+            return Target(source=None, selectors=[])
         return Target(
             source=Document.factory(d['source']),
             selectors=[SelectorFactory.factory(s) for s in d['selector']]
@@ -245,6 +247,10 @@ class Document(RegistryMixin, FromIdFactoryMixin, DocumentFactory):
         self.setattr('annotations', [])
         self.register()
 
+    @property
+    def entities(self):
+        return list(set(a.entity for a in self.annotations))
+
     def __repr__(self):
         return f'Document::{self.id}'
 
@@ -312,23 +318,3 @@ class Task(RegistryMixin, FromIdFactoryMixin, TaskFactory):
 
     def add_document(self, document: Document):
         self.documents.add(document)
-
-    def transform(self, target='binary', label=None):
-        docs = []
-        labels = []
-        if target == 'binary':
-            for doc in self.documents:
-                if len(doc.annotations) > 0:
-                    docs.append(doc.content)
-                    labels.append(1 if label in doc.labels else 0)
-            return docs, labels
-        elif target == 'multilabel':
-            entities = {e['id']: e['title'] for e in self.entities}
-            for document in self.documents:
-                if len(document.annotations) > 0:
-                    docs.append(document.content)
-                    labels.append({entities[l]: 1 for l in document.labels})
-            return docs, labels
-        else:
-            # TODO: raise proper exception
-            raise Exception('target should be `binary` or `multiclass`')

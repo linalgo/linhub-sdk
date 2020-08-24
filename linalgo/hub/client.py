@@ -133,24 +133,32 @@ class LinalgoClient:
         task_json = self.request(task_url)
         task = Task.from_dict(task_json)
         if verbose:
-            print('Retrieving annotators...')
+            print('Retrieving annotators...', end=' ')
         task.annotators = self.get_annotators(task)
         if verbose:
-            print('Retrieving entities...')
+            print(f'({len(task.annotators)} found)')
+        if verbose:
+            print('Retrieving entities...', end=' ')
         params = {'tasks': task.id, 'page_size': 1000}
+        if verbose:
+            print(f'({len(task.entities)} found)')
         entities_url = "{}/{}".format(self.api_url, self.endpoints['entities'])
         entities_json = self.request(entities_url, params)
         task.entities = [Entity.from_dict(e) for e in entities_json['results']]
         if verbose:
-            print('Retrieving documents...')
+            print('Retrieving documents...', end=' ')
         task.documents = self.get_task_documents(task_id)
         if verbose:
-            print('Retrieving annotations...')
+            print(f'({len(task.documents)} found)')
+        if verbose:
+            print('Retrieving annotations...', end=' ')
         task.annotations = self.get_task_annotations(task_id)
+        if verbose:
+            print(f'({len(task.annotations)} found)')
         return task
 
     def get_annotators(self, task=None):
-        params = {'task': task.id, 'page_size': 1000}
+        params = {'tasks': task.id, 'page_size': 1000}
         annotators_url = "{}/{}/".format(
             self.api_url, self.endpoints['annotators'])
         res = self.request(annotators_url, params)
