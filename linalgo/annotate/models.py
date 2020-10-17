@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Dict, Iterable, List, Union
 import json
 import logging
@@ -41,7 +42,7 @@ class TargetFactory:
 
     @staticmethod
     def factory(data):
-        if type(data) == Target:
+        if str(type(data)) == str(Target):
             return data
         elif type(data) == str:
             d = json.loads(data.replace("\'", "\""))
@@ -147,6 +148,10 @@ class Annotation(RegistryMixin, FromIdFactoryMixin, AnnotationFactory):
         self.setattr('document', Document.factory(document))
         self.document.annotations.append(self)
         self.setattr('target', TargetFactory.factory(target))
+        if created is None:
+            created = datetime.now()
+        else:
+            created = datetime.fromisoformat(created)
         self.setattr('created', created)
         self.register()
 

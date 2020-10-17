@@ -75,6 +75,8 @@ class BoundingBox:
         return BoundingBox(left, right, top, bottom)
 
     def overlap(self, bbox):
+        if self.area <= 0:
+            return 0
         intersection = self.intersection(bbox)
         return intersection.area / self.area
 
