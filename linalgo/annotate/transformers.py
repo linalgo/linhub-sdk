@@ -36,11 +36,21 @@ class MultiClassTransformer:
 class MultiLabelTransformer:
 
     def transform(self, task: Task, strategy='keep-all'):
-        if strategy != 'keep-all':
+        if strategy not in ('keep-all', 'keep-last-by-annotator'):
             raise NotImplementedError(f'{strategy} is not a valid strategy.')
         texts, labels = [], []
         for doc in task.documents:
             if len(doc.annotations) > 0:
                 texts.append(doc.content)
-                labels.append({e.name: 1 for e in doc.entities})
+                if strategy == 'keep-last-by-annotator':
+                    d = {}
+                    for a in doc.annotations:
+                        try:
+                            if d[a.annotator.id].created > a.created:
+                                d[a.annotator.id] = a
+                        except:
+                            d[a.annotator.id] = a
+                    labels.append({v.entity.name for k, v in d.items()})
+                elif strategy == 'keep-all':
+                    labels.append({e.name for e in doc.entities})
         return texts, labels

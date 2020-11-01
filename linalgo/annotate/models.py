@@ -1,3 +1,5 @@
+import copy
+
 from datetime import datetime
 from typing import Dict, Iterable, List, Union
 import json
@@ -67,6 +69,11 @@ class Target(TargetFactory):
                  selectors: Iterable[Selector] = []):
         self.source = source
         self.selectors = selectors
+
+    def copy(self):
+        return Target(
+            source=self.source,
+            selectors=[copy.deepcopy(s) for s in self.selectors])
 
 
 class RegistryMixin:
@@ -157,6 +164,12 @@ class Annotation(RegistryMixin, FromIdFactoryMixin, AnnotationFactory):
 
     def __repr__(self):
         return f'Annotation::{self.entity.name or self.entity.id}'
+
+    def copy(self):
+        target = self.target.copy()
+        return Annotation(unique_id=uuid.uuid4(), entity=self.entity,
+                document=self.document, task=self.task, target=target,
+                body=self.body, annotator=self.annotator,  score=self.score)
 
 
 class AnnotatorFactory:
