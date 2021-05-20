@@ -227,13 +227,25 @@ class Annotator(RegistryMixin, FromIdFactoryMixin, AnnotatorFactory):
         return annotation
 
 
-class Corpus(RegistryMixin, FromIdFactoryMixin):
+class CorpusFactory:
+
+    @staticmethod
+    def from_dict(d):
+        return Corpus(
+            unique_id=d['id'],
+            name=d['name'],
+            description=d['description'],
+        )
+
+
+class Corpus(RegistryMixin, FromIdFactoryMixin, CorpusFactory):
 
     def __init__(self, name: str = None, description: str = None,
                  documents: Iterable['Document'] = [], **kwargs):
         self.setattr('name', name)
         self.setattr('description', description)
-        self.setattr('documents', [Document.factory(d) for d in documents])
+        if len(documents) > 0:
+            self.setattr('documents', [Document.factory(d) for d in documents])
         self.register()
 
     def __repr__(self):

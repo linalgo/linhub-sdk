@@ -77,15 +77,16 @@ class LinalgoClient:
         return corpora
 
     def get_corpus(self, corpus_id):
-        url = f"{self.enpoints['corpora']}/{corpus_id}/"
+        url = f"{self.api_url}/{self.endpoints['corpora']}/{corpus_id}/"
         res = self.request(url)
-        corpus = Corpus(name=res['name'], description=res['description'])
+        corpus = Corpus.from_dict(res)
+        # corpus = Corpus(name=res['name'], description=res['description'])
         documents = self.get_corpus_documents(corpus_id)
         corpus.documents = documents
         return corpus
 
     def get_corpus_documents(self, corpus_id):
-        url = f"/corpora/{corpus_id}/documents/?page_size=1000"
+        url = f"{self.api_url}/documents/?page_size=1000&corpus={corpus_id}"
         res = self.request(url)
         documents = []
         for d in res['results']:

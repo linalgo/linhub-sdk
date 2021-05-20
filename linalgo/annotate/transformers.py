@@ -19,17 +19,20 @@ class BinaryTransformer:
 
 class MultiClassTransformer:
 
-    def transform(self, task: Task, strategy='latest', ignore=[]):
-        if strategy != 'latest':
+    def transform(self, task: Task, strategy='latest', ignore=[], keep_ids=False):
+        if strategy not in ('latest', 'majority'):
             raise NotImplementedError(f'{strategy} is not a valid strategy.')
-        texts, labels = [], []
+        texts, labels, doc_ids = [], [], []
         for doc in task.documents:
             aa = [a for a in doc.annotations if a.task == task]
             aa = [a for a in aa if a.entity not in ignore]
             if len(aa) > 0:
                 annotations = sorted(aa, key=lambda a: a.created, reverse=True)
+                doc_ids.append(doc.id)
                 texts.append(doc.content)
                 labels.append(annotations[0].entity.name)
+        if keep_ids:
+            return doc_ids, texts, labels
         return texts, labels
 
 
